@@ -53,6 +53,7 @@ body.dark .shortcut{background:var(--card-bg-dark)}
 .shortcut .delete-btn {
   z-index: 5;
   pointer-events: auto;
+  touch-action: none;
 }
 
 /* drag over indicator */
@@ -168,27 +169,26 @@ function renderShortcuts(){
     delBtn.title = 'Delete';
 
     // attach handlers that fully consume events (both mouse and touch)
-    function consumeEvent(e){ e.stopPropagation(); e.preventDefault && e.preventDefault(); return false; }
+    function consumeEvent(e) {
+      e.stopPropagation();
+      e.preventDefault && e.preventDefault();
+      return false;
+    }
 
-    // edit: open modal prefilled; must not propagate to tile tap
-    editBtn.addEventListener('click', (ev) => {
-      consumeEvent(ev);
-      openEditModal(i);
-    }, {passive:false});
-    // ensure touch events on button don't fall through to tile tap
-    editBtn.addEventListener('touchstart', consumeEvent, {passive:false});
-    editBtn.addEventListener('touchend', consumeEvent, {passive:false});
+    // Apply to edit and delete buttons
+    ['click', 'pointerdown', 'pointerup', 'touchstart', 'touchend'].forEach(evt => {
+      editBtn.addEventListener(evt, consumeEvent, {passive:false});
+      delBtn.addEventListener(evt, consumeEvent, {passive:false});
+    });
 
-    // delete: confirm + remove
-    delBtn.addEventListener('click', (ev) => {
-      consumeEvent(ev);
+    // Separate click handlers for their actual actions
+    editBtn.addEventListener('click', () => openEditModal(i));
+    delBtn.addEventListener('click', () => {
       if (confirm('Delete this shortcut?')) {
-        shortcuts.splice(i,1);
+        shortcuts.splice(i, 1);
         saveAndRender();
       }
-    }, {passive:false});
-    delBtn.addEventListener('touchstart', consumeEvent, {passive:false});
-    delBtn.addEventListener('touchend', consumeEvent, {passive:false});
+    });
 
     tile.appendChild(editBtn);
     tile.appendChild(delBtn);
