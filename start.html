@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Custom Start Page</title>
 <style>
   :root {
@@ -38,7 +38,7 @@
   }
 
   #search-container {
-    flex: 1;
+    flex: 0 0 80%;
     margin-right: 10px;
   }
 
@@ -50,7 +50,6 @@
     font-size: 16px;
   }
 
-  /* Three-dot settings icon */
   #settings-button {
     background: none;
     border: none;
@@ -61,7 +60,6 @@
     z-index: 20;
   }
 
-  /* Settings dropdown menu */
   #settings-menu {
     position: absolute;
     right: 15px;
@@ -93,7 +91,6 @@
     background: rgba(0,0,0,0.1);
   }
 
-  /* Shortcuts grid */
   #shortcuts {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -108,18 +105,25 @@
     padding: 15px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     transition: transform 0.2s;
-    cursor: pointer;
-    overflow-wrap: break-word;
+    cursor: grab;
+    user-select: none;
   }
   body.dark .shortcut {
     background: var(--card-bg-dark);
   }
-
+  .shortcut:active {
+    cursor: grabbing;
+  }
   .shortcut:hover {
     transform: scale(1.05);
   }
 
-  /* Add Shortcut Dialog */
+  .shortcut img {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 8px;
+  }
+
   #add-dialog {
     display: none;
     position: fixed;
@@ -159,6 +163,10 @@
     cursor: pointer;
   }
 
+  .drag-over {
+    outline: 2px dashed #666;
+    transform: scale(1.03);
+  }
 </style>
 </head>
 <body>
@@ -170,7 +178,6 @@
   <button id="settings-button" title="Settings">⋮</button>
 </header>
 
-<!-- Settings Menu -->
 <div id="settings-menu">
   <button id="toggle-theme">Toggle Dark/Light</button>
   <button id="add-shortcut-btn">Add Shortcut</button>
@@ -178,10 +185,8 @@
   <button id="export-btn">Export Shortcuts</button>
 </div>
 
-<!-- Shortcuts -->
 <div id="shortcuts"></div>
 
-<!-- Add Shortcut Dialog -->
 <div id="add-dialog">
   <form id="add-form">
     <h3>Add Shortcut</h3>
@@ -207,7 +212,65 @@
   const importBtn = document.getElementById('import-btn');
   const exportBtn = document.getElementById('export-btn');
 
-  // --- Search behavior
+  let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]');
+
+  // Backward compatibility: normalize old shortcuts
+  shortcuts = shortcuts.map(s => ({
+    name: s.name || s.title || 'Unnamed',
+    url: s.url || s.href || ''
+  }));
+
+  const renderShortcuts = () => {
+    shortcutsContainer.innerHTML = '';
+    shortcuts.forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = 'shortcut';
+      el.draggable = true;
+      el.dataset.index = i;
+
+      const favicon = document.createElement('img');
+      const domain = s.url ? new URL(s.url).origin : '';
+      favicon.src = `https://www.google.com/s2/favicons?sz=64&domain_url=${domain}`;
+
+      const label = document.createElement('div');
+      label.innerText = s.name || 'Unnamed';
+
+      el.appendChild(favicon);
+      el.appendChild(label);
+
+      el.addEventListener('click', e => {
+        if (!el.classList.contains('dragging') && s.url)
+          window.open(s.url, '_self');
+      });
+
+      el.addEventListener('dragstart', e => {
+        el.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', i);
+      });
+      el.addEventListener('dragend', () => el.classList.remove('dragging'));
+      el.addEventListener('dragover', e => {
+        e.preventDefault();
+        el.classList.add('drag-over');
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        const from = parseInt(e.dataTransfer.getData('text/plain'));
+        const to = parseInt(el.dataset.index);
+        el.classList.remove('drag-over');
+        if (from !== to) {
+          const moved = shortcuts.splice(from, 1)[0];
+          shortcuts.splice(to, 0, moved);
+          localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
+          renderShortcuts();
+        }
+      });
+
+      shortcutsContainer.appendChild(el);
+    });
+  };
+  renderShortcuts();
+
   search.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       const q = encodeURIComponent(search.value.trim());
@@ -215,24 +278,9 @@
     }
   });
 
-  // --- Local storage handling
-  let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]');
-  const renderShortcuts = () => {
-    shortcutsContainer.innerHTML = '';
-    shortcuts.forEach((s, i) => {
-      const el = document.createElement('div');
-      el.className = 'shortcut';
-      el.innerText = s.name;
-      el.onclick = () => window.open(s.url, '_self');
-      shortcutsContainer.appendChild(el);
-    });
-  };
-  renderShortcuts();
-
-  // --- Settings menu toggle
   settingsButton.addEventListener('click', () => {
-    const isVisible = settingsMenu.style.display === 'block';
-    settingsMenu.style.display = isVisible ? 'none' : 'block';
+    const visible = settingsMenu.style.display === 'block';
+    settingsMenu.style.display = visible ? 'none' : 'block';
   });
   window.addEventListener('click', e => {
     if (!settingsButton.contains(e.target) && !settingsMenu.contains(e.target)) {
@@ -240,14 +288,14 @@
     }
   });
 
-  // --- Theme toggle
-  if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+  if (localStorage.getItem('theme') === 'dark')
+    document.body.classList.add('dark');
   toggleThemeBtn.addEventListener('click', () => {
     document.body.classList.toggle('dark');
-    localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    localStorage.setItem('theme',
+      document.body.classList.contains('dark') ? 'dark' : 'light');
   });
 
-  // --- Add Shortcut Dialog
   addShortcutBtn.addEventListener('click', () => {
     addDialog.style.display = 'flex';
   });
@@ -266,7 +314,6 @@
     addForm.reset();
   });
 
-  // --- Import / Export
   exportBtn.addEventListener('click', () => {
     const data = JSON.stringify(shortcuts);
     const blob = new Blob([data], { type: 'application/json' });
@@ -289,11 +336,14 @@
         try {
           const imported = JSON.parse(reader.result);
           if (Array.isArray(imported)) {
-            shortcuts = imported;
+            shortcuts = imported.map(s => ({
+              name: s.name || s.title || 'Unnamed',
+              url: s.url || s.href || ''
+            }));
             localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
             renderShortcuts();
           }
-        } catch (err) {
+        } catch {
           alert('Invalid file format.');
         }
       };
