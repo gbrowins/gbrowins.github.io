@@ -86,19 +86,13 @@ body.dark .shortcut { background: var(--card-bg-dark); }
 .shortcut:hover { transform: scale(1.05); }
 .shortcut img { width: 32px; height: 32px; margin-bottom: 8px; }
 
-.shortcut .edit-icons {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  display: flex;
-  gap: 5px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
+/* Glow effect when edit mode active */
 .shortcut.show-icons { box-shadow: 0 0 15px 3px rgba(255,165,0,0.7); }
-.shortcut.show-icons .edit-icons { opacity: 1; }
 
-.shortcut .edit-icons button {
+/* Edit/Delete buttons positioned separately */
+.shortcut .edit-btn,
+.shortcut .delete-btn {
+  position: absolute;
   background: rgba(0, 0, 0, 0.4);
   border: none;
   color: #fff;
@@ -106,7 +100,13 @@ body.dark .shortcut { background: var(--card-bg-dark); }
   padding: 2px 4px;
   cursor: pointer;
   font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
+.shortcut.show-icons .edit-btn,
+.shortcut.show-icons .delete-btn { opacity: 1; }
+.shortcut .edit-btn { top: 5px; left: 5px; }
+.shortcut .delete-btn { top: 5px; right: 5px; }
 
 #add-dialog {
   display: none;
@@ -213,9 +213,9 @@ const renderShortcuts = () => {
     const label = document.createElement('div');
     label.innerText = s.name || 'Unnamed';
 
-    const editIcons = document.createElement('div');
-    editIcons.className = 'edit-icons';
+    // Edit button
     const editBtn = document.createElement('button');
+    editBtn.className = 'edit-btn';
     editBtn.innerText = '✏️';
     editBtn.title = 'Edit';
     editBtn.onclick = e => {
@@ -227,7 +227,10 @@ const renderShortcuts = () => {
       document.getElementById('shortcut-url').value = s.url;
       addDialog.style.display = 'flex';
     };
+
+    // Delete button
     const delBtn = document.createElement('button');
+    delBtn.className = 'delete-btn';
     delBtn.innerText = '❌';
     delBtn.title = 'Delete';
     delBtn.onclick = e => {
@@ -238,32 +241,39 @@ const renderShortcuts = () => {
         renderShortcuts();
       }
     };
-    editIcons.appendChild(editBtn);
-    editIcons.appendChild(delBtn);
 
-    el.appendChild(editIcons);
+    el.appendChild(editBtn);
+    el.appendChild(delBtn);
     el.appendChild(favicon);
     el.appendChild(label);
 
-    el.addEventListener('click', e => {
-      if (!isDragging && s.url) window.open(s.url, '_blank');
+    // Long press + tap logic
+    let touchStartTime = 0;
+    el.addEventListener('touchstart', e => {
+      touchStartTime = Date.now();
+      longPressTimer = setTimeout(() => {
+        el.classList.add('show-icons');
+      }, 600);
     });
 
-    // Long press
-    const startPress = () => {
-      longPressTimer = setTimeout(() => el.classList.add('show-icons'), 600);
-    };
-    const cancelPress = () => clearTimeout(longPressTimer);
+    el.addEventListener('touchmove', e => {
+      isDragging = true;
+      clearTimeout(longPressTimer);
+    });
 
-    el.addEventListener('touchstart', startPress);
-    el.addEventListener('touchend', cancelPress);
-    el.addEventListener('touchmove', () => { isDragging = true; cancelPress(); });
-    el.addEventListener('mousedown', startPress);
-    el.addEventListener('mouseup', cancelPress);
-    el.addEventListener('mousemove', () => isDragging = true);
+    el.addEventListener('touchend', e => {
+      clearTimeout(longPressTimer);
+      if (!isDragging && (Date.now() - touchStartTime) < 500) {
+        if (s.url) window.open(s.url, '_blank');
+      }
+      isDragging = false;
+    });
 
-    window.addEventListener('click', e => {
-      if (!el.contains(e.target)) el.classList.remove('show-icons');
+    // Mouse click
+    el.addEventListener('click', e => {
+      if (!isDragging && !e.target.classList.contains('edit-btn') && !e.target.classList.contains('delete-btn')) {
+        if (s.url) window.open(s.url, '_blank');
+      }
     });
 
     // Drag & drop
