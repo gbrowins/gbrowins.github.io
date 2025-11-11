@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Custom Start Page</title>
+<title>Custom Start Page (fixed pointer handling)</title>
 <style>
 :root{
   --bg-light:#fafafa;--bg-dark:#1e1e1e;
@@ -23,38 +23,23 @@ body.dark #settings-menu{background:var(--card-bg-dark);border-color:#555}
 
 #shortcuts{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:15px;padding:15px}
 
-.shortcut{position:relative;text-align:center;background:var(--card-bg-light);border-radius:8px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.12);transition:transform .18s,box-shadow .18s;border:1px solid transparent;cursor:grab;user-select:none;touch-action:none}
+.shortcut{position:relative;text-align:center;background:var(--card-bg-light);border-radius:8px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.12);transition:transform .18s,box-shadow .18s,border .18s;cursor:grab;user-select:none;touch-action:none}
 body.dark .shortcut{background:var(--card-bg-dark)}
 .shortcut:active{cursor:grabbing}
 .shortcut:hover{transform:scale(1.03)}
-.shortcut img{width:32px;height:32px;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto}
+.shortcut img{width:32px;height:32px;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;pointer-events:none;-webkit-touch-callout:none;-webkit-user-drag:none}
 
 /* glow in edit mode */
 .shortcut.show-icons{box-shadow:0 0 16px 4px rgba(255,160,0,.65);}
 
 /* separate edit/delete buttons */
 .shortcut .edit-btn,.shortcut .delete-btn{
-  position:absolute;background:rgba(0,0,0,.5);border:none;color:#fff;border-radius:4px;padding:3px 5px;cursor:pointer;font-size:12px;opacity:0;transition:opacity .18s,transform .18s;
-  -webkit-tap-highlight-color: transparent;
+  position:absolute;background:rgba(0,0,0,.5);border:none;color:#fff;border-radius:4px;padding:3px 5px;cursor:pointer;font-size:12px;opacity:0;transition:opacity .18s,transform .12s;z-index:5;pointer-events:auto;touch-action:none
 }
 .shortcut.show-icons .edit-btn,.shortcut.show-icons .delete-btn{opacity:1}
 .shortcut .edit-btn{top:6px;left:6px}
 .shortcut .delete-btn{top:6px;right:6px}
 .shortcut .edit-btn:active,.shortcut .delete-btn:active{transform:scale(.95)}
-
-/* Disable right-click menu for tile images */
-.shortcut img {
-  pointer-events: none;
-  -webkit-touch-callout: none;
-  -webkit-user-drag: none;
-}
-
-.shortcut .edit-btn,
-.shortcut .delete-btn {
-  z-index: 5;
-  pointer-events: auto;
-  touch-action: none;
-}
 
 /* drag over indicator */
 .drag-over{outline:2px dashed #666;transform:scale(1.02)}
@@ -65,22 +50,18 @@ body.dark .shortcut{background:var(--card-bg-dark)}
 body.dark #add-dialog form{background:var(--card-bg-dark)}
 #add-dialog input{width:80%;margin:0 10%;margin-bottom:10px;padding:8px;border-radius:5px;border:1px solid #999}
 #add-dialog button{margin-right:8px;padding:8px 12px;border:none;border-radius:5px;cursor:pointer}
-
-/* small helper to make buttons smaller on small screens */
 .small-btn{font-size:0.9rem;padding:.3rem .6rem;border-radius:6px}
 </style>
 </head>
 <body>
 <header>
-  <div id="search-container">
-    <input id="search" type="text" placeholder="Search DuckDuckGo..." />
-  </div>
+  <div id="search-container"><input id="search" type="text" placeholder="Search DuckDuckGo..." /></div>
   <button id="settings-button" title="Settings">⋮</button>
 </header>
 
 <div id="settings-menu" role="menu" aria-hidden="true">
-  <button id="toggle-theme" class="small-btn">Toggle Dark/Light</button>
   <button id="add-shortcut-btn" class="small-btn">Add Shortcut</button>
+  <button id="toggle-theme" class="small-btn">Toggle Dark/Light</button>
   <button id="import-btn" class="small-btn">Import Shortcuts</button>
   <button id="export-btn" class="small-btn">Export Shortcuts</button>
 </div>
@@ -100,322 +81,214 @@ body.dark #add-dialog form{background:var(--card-bg-dark)}
 </div>
 
 <script>
-/* ---------- Utilities ---------- */
-const el = id => document.getElementById(id);
-const shortcutsEl = el('shortcuts');
-const search = el('search');
-const settingsButton = el('settings-button');
-const settingsMenu = el('settings-menu');
-const toggleThemeBtn = el('toggle-theme');
-const addShortcutBtn = el('add-shortcut-btn');
-const addDialog = el('add-dialog');
-const addForm = el('add-form');
-const cancelAdd = el('cancel-add');
-const addSaveBtn = el('add-save-btn');
-const dialogTitle = el('dialog-title');
-const importBtn = el('import-btn');
-const exportBtn = el('export-btn');
+/* helpers */
+const $ = id => document.getElementById(id);
+const shortcutsEl = $('shortcuts');
+const search = $('search');
+const settingsButton = $('settings-button');
+const settingsMenu = $('settings-menu');
+const toggleThemeBtn = $('toggle-theme');
+const addShortcutBtn = $('add-shortcut-btn');
+const addDialog = $('add-dialog');
+const addForm = $('add-form');
+const cancelAdd = $('cancel-add');
+const addSaveBtn = $('add-save-btn');
+const dialogTitle = $('dialog-title');
+const importBtn = $('import-btn');
+const exportBtn = $('export-btn');
 
 let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]')
   .map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' }));
-
 let editIndex = null;
 
-/* single document-level click handler to close edit-mode if clicking outside tiles/settings */
+/* document-level click: close edit mode & settings if click outside tiles/menu */
 document.addEventListener('click', (ev) => {
-  // if click is inside settings menu or settings button, leave menu handling to its toggler
   if (settingsButton.contains(ev.target) || settingsMenu.contains(ev.target)) return;
-  // if click is inside a tile (or its edit/delete buttons), do nothing here (tile logic handles it)
   if (ev.target.closest('.shortcut')) return;
-
-  // otherwise remove 'show-icons' from all tiles (exit edit mode)
   document.querySelectorAll('.shortcut.show-icons').forEach(t => t.classList.remove('show-icons'));
-
-  // also hide the settings menu if clicking elsewhere
   settingsMenu.style.display = 'none';
 });
 
-/* ---------- Render / Re-render ---------- */
+/* render */
 function renderShortcuts(){
   shortcutsEl.innerHTML = '';
   shortcuts.forEach((s, i) => {
     const tile = document.createElement('div');
     tile.className = 'shortcut';
-    tile.draggable = true;
     tile.dataset.index = i;
+    tile.draggable = true;
 
-    // favicon
     const favicon = document.createElement('img');
-    try {
-      const domain = s.url ? new URL(s.url).origin : '';
-      favicon.src = `https://www.google.com/s2/favicons?sz=64&domain_url=${domain}`;
-    } catch(_) {
-      favicon.src = '';
-    }
+    try { favicon.src = s.url ? `https://www.google.com/s2/favicons?sz=64&domain_url=${new URL(s.url).origin}` : ''; } catch(e){ favicon.src=''; }
 
-    // label
-    const label = document.createElement('div');
-    label.textContent = s.name || 'Unnamed';
+    const label = document.createElement('div'); label.textContent = s.name || 'Unnamed';
 
-    // edit & delete buttons (separate corners)
-    const editBtn = document.createElement('button');
-    editBtn.className = 'edit-btn';
-    editBtn.innerText = '✏️';
-    editBtn.title = 'Edit';
+    const editBtn = document.createElement('button'); editBtn.className='edit-btn'; editBtn.innerText='✏️'; editBtn.title='Edit';
+    const delBtn  = document.createElement('button'); delBtn.className='delete-btn'; delBtn.innerText='❌'; delBtn.title='Delete';
 
-    const delBtn = document.createElement('button');
-    delBtn.className = 'delete-btn';
-    delBtn.innerText = '❌';
-    delBtn.title = 'Delete';
+    /* Prevent tile handlers from running when interacting with these buttons.
+       Use pointerdown to immediately consume pointer and avoid other handlers. */
+    const consume = e => { e.stopPropagation(); if (e.preventDefault) e.preventDefault(); };
 
-    // attach handlers that fully consume events (both mouse and touch)
-    function consumeEvent(e) {
-      e.stopPropagation();
-      e.preventDefault && e.preventDefault();
-      return false;
-    }
+    editBtn.addEventListener('pointerdown', consume, {passive:false});
+    delBtn.addEventListener('pointerdown', consume, {passive:false});
 
-    // Apply to edit and delete buttons
-    ['click', 'pointerdown', 'pointerup', 'touchstart', 'touchend'].forEach(evt => {
-      editBtn.addEventListener(evt, consumeEvent, {passive:false});
-      delBtn.addEventListener(evt, consumeEvent, {passive:false});
-    });
-
-    // Separate click handlers for their actual actions
-    editBtn.addEventListener('click', () => openEditModal(i));
-    delBtn.addEventListener('click', () => {
-      if (confirm('Delete this shortcut?')) {
-        shortcuts.splice(i, 1);
-        saveAndRender();
-      }
-    });
+    // pointerup triggers action (works for mouse and touch)
+    editBtn.addEventListener('pointerup', (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      openEditModal(i);
+    }, {passive:false});
+    delBtn.addEventListener('pointerup', (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      if (confirm('Delete this shortcut?')) { shortcuts.splice(i,1); saveAndRender(); }
+    }, {passive:false});
 
     tile.appendChild(editBtn);
     tile.appendChild(delBtn);
     tile.appendChild(favicon);
     tile.appendChild(label);
+    shortcutsEl.appendChild(tile);
 
-    /* ---------- Touch / Mouse interplay: long-press, tap, touch-drag fallback ---------- */
-    let touchStartTime = 0;
+    /* ---- pointer-based interaction for tile ----
+       pointerdown -> start longpress timer and record coords
+       pointermove -> detect movement (>threshold) => dragging candidate
+       pointerup   -> if dragging => perform reorder on touch; if short tap => open url; if longpress fired => nothing (icons shown)
+    */
+    let pointerId = null;
     let startX = 0, startY = 0;
-    let touchDragging = false;
-    let dragOverTarget = null;
-
-    // helper to clear long-press timer
+    let moved = false;
+    let longPressFired = false;
     let longPressTimer = null;
-    const startLongPress = () => {
+    const LONG_PRESS_MS = 600;
+    const MOVE_THRESHOLD = 8;
+
+    function startPointer(ev){
+      // only handle primary button/pointer
+      if (ev.isPrimary === false) return;
+      pointerId = ev.pointerId;
+      moved = false;
+      longPressFired = false;
+      startX = ev.clientX;
+      startY = ev.clientY;
+      // start long press timer
       clearLongPress();
       longPressTimer = setTimeout(() => {
-        // show edit icons for this tile
+        longPressFired = true;
         tile.classList.add('show-icons');
-      }, 600);
-    };
-    const clearLongPress = () => { if (longPressTimer){ clearTimeout(longPressTimer); longPressTimer = null; } };
-
-    // touchstart: start the timer, record coords
-    tile.addEventListener('touchstart', (ev) => {
-      touchDragging = false;
-      touchStartTime = Date.now();
-      const t = ev.touches[0];
-      startX = t.clientX; startY = t.clientY;
-      startLongPress();
-    }, {passive:true});
-
-    // touchmove: if significant movement, treat as dragging and cancel long-press; highlight drop targets
-    tile.addEventListener('touchmove', (ev) => {
-      const t = ev.touches[0];
-      const dx = Math.abs(t.clientX - startX), dy = Math.abs(t.clientY - startY);
-      if ((dx > 8 || dy > 8)) {
-        touchDragging = true;
+      }, LONG_PRESS_MS);
+      // capture pointer so we get moves/up even if pointer leaves
+      try { tile.setPointerCapture(pointerId); } catch(e){}
+    }
+    function movePointer(ev){
+      if (ev.pointerId !== pointerId) return;
+      const dx = Math.abs(ev.clientX - startX), dy = Math.abs(ev.clientY - startY);
+      if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD){
+        moved = true;
         clearLongPress();
-
-        // highlight potential target tile under finger
-        const under = document.elementFromPoint(t.clientX, t.clientY);
+        // highlight potential drop target
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
         const potential = under ? under.closest('.shortcut') : null;
-        if (potential && potential !== tile) {
-          // add drag-over to potential, remove from previous
-          if (dragOverTarget && dragOverTarget !== potential) dragOverTarget.classList.remove('drag-over');
-          dragOverTarget = potential;
-          dragOverTarget.classList.add('drag-over');
-        } else {
-          if (dragOverTarget) { dragOverTarget.classList.remove('drag-over'); dragOverTarget = null; }
-        }
+        document.querySelectorAll('.shortcut').forEach(n=>n.classList.remove('drag-over'));
+        if (potential && potential !== tile) potential.classList.add('drag-over');
       }
-    }, {passive:true});
-
-    // touchend: if we were dragging, perform reorder if necessary; else if short tap and not over button => open
-    tile.addEventListener('touchend', (ev) => {
+    }
+    function endPointer(ev){
+      if (ev.pointerId !== pointerId) return;
       clearLongPress();
-      // remove any drag-over marks
-      if (dragOverTarget) dragOverTarget.classList.remove('drag-over');
-
-      // if touchDragging, treat as reorder gesture
-      if (touchDragging) {
-        const changed = ev.changedTouches[0];
-        const under = document.elementFromPoint(changed.clientX, changed.clientY);
-        const targetTile = under ? under.closest('.shortcut') : null;
-        if (targetTile && targetTile !== tile) {
-          const fromIndex = parseInt(tile.dataset.index,10);
-          const toIndex = parseInt(targetTile.dataset.index,10);
-          if (!Number.isNaN(fromIndex) && !Number.isNaN(toIndex) && fromIndex !== toIndex) {
-            const moved = shortcuts.splice(fromIndex,1)[0];
-            shortcuts.splice(toIndex,0,moved);
+      try { tile.releasePointerCapture(pointerId); } catch(e){}
+      document.querySelectorAll('.shortcut').forEach(n=>n.classList.remove('drag-over'));
+      // if moved -> reorder (touch style)
+      if (moved){
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
+        const target = under ? under.closest('.shortcut') : null;
+        if (target && target !== tile){
+          const from = parseInt(tile.dataset.index,10);
+          const to   = parseInt(target.dataset.index,10);
+          if (!Number.isNaN(from) && !Number.isNaN(to) && from !== to){
+            const movedItem = shortcuts.splice(from,1)[0];
+            shortcuts.splice(to,0,movedItem);
             saveAndRender();
           }
         }
-        touchDragging = false;
+        pointerId = null; moved=false;
         return;
       }
+      // if long press was fired, we already showed icons; don't open URL on release
+      if (longPressFired){ pointerId = null; return; }
 
-      // not a drag; determine if touchend happened over a button (edit/delete)
-      const changed = ev.changedTouches[0];
-      const elementAt = document.elementFromPoint(changed.clientX, changed.clientY);
-      if (elementAt && (elementAt.closest('.edit-btn') || elementAt.closest('.delete-btn'))) {
-        // let the button handlers run (they already stopped propagation)
-        return;
-      }
-
-      // short tap -> open url
-      const elapsed = Date.now() - touchStartTime;
-      if (elapsed < 500 && !touchDragging) {
+      // short tap -> open url (but ensure the tap wasn't on a button; buttons consumed pointerdown so won't reach here)
+      if (!moved){
         if (s.url) window.open(s.url, '_blank');
       }
-    }, {passive:false});
+      pointerId = null;
+    }
+    function cancelPointer(ev){
+      if (ev.pointerId !== pointerId) return;
+      clearLongPress();
+      try{ tile.releasePointerCapture(pointerId);}catch(e){}
+      pointerId = null; moved=false;
+    }
+    function clearLongPress(){ if (longPressTimer){ clearTimeout(longPressTimer); longPressTimer=null; } }
 
-    /* ---------- Mouse behaviors (desktop) ---------- */
-    // click for mouse; ignore if click was on edit/delete button
-    tile.addEventListener('click', (ev) => {
-      if (ev.target.closest('.edit-btn') || ev.target.closest('.delete-btn')) return;
-      if (s.url) window.open(s.url, '_blank');
-    });
+    tile.addEventListener('pointerdown', startPointer, {passive:false});
+    tile.addEventListener('pointermove', movePointer, {passive:true});
+    tile.addEventListener('pointerup', endPointer, {passive:false});
+    tile.addEventListener('pointercancel', cancelPointer, {passive:false});
 
-    // drag & drop for desktop
-    tile.addEventListener('dragstart', (ev) => {
-      ev.dataTransfer.setData('text/plain', tile.dataset.index);
-      tile.classList.add('dragging');
-    });
-    tile.addEventListener('dragend', () => {
-      tile.classList.remove('dragging');
-      // clear any drag-over visuals
-      document.querySelectorAll('.drag-over').forEach(n => n.classList.remove('drag-over'));
-    });
-
-    tile.addEventListener('dragover', (ev) => {
-      ev.preventDefault();
-      // highlight as a drop target (but don't highlight itself)
-      if (!tile.classList.contains('dragging')) tile.classList.add('drag-over');
-    });
+    /* desktop native drag/drop (mouse) still supported */
+    tile.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', tile.dataset.index); tile.classList.add('dragging'); });
+    tile.addEventListener('dragend', () => { tile.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(n=>n.classList.remove('drag-over')); });
+    tile.addEventListener('dragover', (e) => { e.preventDefault(); if (!tile.classList.contains('dragging')) tile.classList.add('drag-over'); });
     tile.addEventListener('dragleave', () => tile.classList.remove('drag-over'));
-    tile.addEventListener('drop', (ev) => {
-      ev.preventDefault();
-      const from = parseInt(ev.dataTransfer.getData('text/plain'),10);
+    tile.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData('text/plain'),10);
       const to = parseInt(tile.dataset.index,10);
       tile.classList.remove('drag-over');
-      if (!Number.isNaN(from) && !Number.isNaN(to) && from !== to) {
-        const moved = shortcuts.splice(from,1)[0];
-        shortcuts.splice(to,0,moved);
+      if (!Number.isNaN(from) && !Number.isNaN(to) && from !== to){
+        const movedItem = shortcuts.splice(from,1)[0];
+        shortcuts.splice(to,0,movedItem);
         saveAndRender();
       }
     });
-
-    shortcutsEl.appendChild(tile);
   });
-  // update dataset.index for all tiles after re-render
+  // ensure dataset indices are correct
   document.querySelectorAll('.shortcut').forEach((t,idx)=> t.dataset.index = idx);
 }
 
-/* ---------- Helpers ---------- */
-function saveAndRender(){
-  localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
-  renderShortcuts();
-}
+/* save + render */
+function saveAndRender(){ localStorage.setItem('shortcuts', JSON.stringify(shortcuts)); renderShortcuts(); }
 
-/* ---------- Search ---------- */
-search.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    const q = encodeURIComponent(search.value.trim());
-    if (q) window.location.href = `https://duckduckgo.com/?q=${q}`;
-  }
-});
+/* search */
+search.addEventListener('keydown', (e) => { if (e.key==='Enter'){ const q=encodeURIComponent(search.value.trim()); if (q) window.location.href=`https://duckduckgo.com/?q=${q}`;} });
 
-/* ---------- Settings menu toggle ---------- */
-settingsButton.addEventListener('click', (ev) => {
-  ev.stopPropagation();
-  const visible = settingsMenu.style.display === 'block';
-  settingsMenu.style.display = visible ? 'none' : 'block';
-});
+/* settings menu */
+settingsButton.addEventListener('click', (ev)=>{ ev.stopPropagation(); settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block'; });
 
-/* ---------- Theme toggle ---------- */
-if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
-toggleThemeBtn.addEventListener('click', () => {
-  const dark = !document.body.classList.toggle('dark');
-  // toggling returns false/void; set storage based on class
-  localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
-});
+/* theme */
+if (localStorage.getItem('theme')==='dark') document.body.classList.add('dark');
+toggleThemeBtn.addEventListener('click', ()=>{ document.body.classList.toggle('dark'); localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light'); });
 
-/* ---------- Add / Edit Modal handling ---------- */
+/* modal add/edit */
 function openEditModal(index){
   editIndex = index;
   dialogTitle.textContent = 'Edit Shortcut';
   addSaveBtn.textContent = 'Save';
-  el('shortcut-name').value = shortcuts[index].name;
-  el('shortcut-url').value = shortcuts[index].url;
+  $('shortcut-name').value = shortcuts[index].name;
+  $('shortcut-url').value = shortcuts[index].url;
   addDialog.style.display = 'flex';
 }
-addShortcutBtn.addEventListener('click', () => {
-  editIndex = null;
-  dialogTitle.textContent = 'Add Shortcut';
-  addSaveBtn.textContent = 'Add';
-  addForm.reset();
-  addDialog.style.display = 'flex';
-});
-cancelAdd.addEventListener('click', () => {
-  addDialog.style.display = 'none';
-  editIndex = null;
-});
-addForm.addEventListener('submit', (ev) => {
-  ev.preventDefault();
-  const name = el('shortcut-name').value.trim();
-  const url = el('shortcut-url').value.trim();
-  if (!name || !url) return;
-  if (editIndex !== null) {
-    shortcuts[editIndex] = { name, url };
-  } else {
-    shortcuts.push({ name, url });
-  }
-  saveAndRender();
-  addDialog.style.display = 'none';
-  editIndex = null;
-});
+addShortcutBtn.addEventListener('click', ()=>{ editIndex=null; dialogTitle.textContent='Add Shortcut'; addSaveBtn.textContent='Add'; addForm.reset(); addDialog.style.display='flex'; });
+cancelAdd.addEventListener('click', ()=>{ addDialog.style.display='none'; editIndex=null; });
+addForm.addEventListener('submit', (ev)=>{ ev.preventDefault(); const name=$('shortcut-name').value.trim(); const url=$('shortcut-url').value.trim(); if(!name||!url) return; if(editIndex!==null) shortcuts[editIndex]={name,url}; else shortcuts.push({name,url}); saveAndRender(); addDialog.style.display='none'; editIndex=null; });
 
-/* ---------- Export / Import ---------- */
-exportBtn.addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(shortcuts,null,2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'shortcuts.json'; a.click();
-  URL.revokeObjectURL(url);
-});
-importBtn.addEventListener('click', () => {
-  const input = document.createElement('input'); input.type='file'; input.accept='application/json';
-  input.onchange = (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => {
-      try {
-        const data = JSON.parse(r.result);
-        if (Array.isArray(data)) {
-          shortcuts = data.map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' }));
-          saveAndRender();
-        } else alert('Invalid file format');
-      } catch(err){ alert('Invalid file'); }
-    };
-    r.readAsText(f);
-  };
-  input.click();
-});
+/* export/import */
+exportBtn.addEventListener('click', ()=>{ const b=new Blob([JSON.stringify(shortcuts,null,2)],{type:'application/json'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='shortcuts.json'; a.click(); URL.revokeObjectURL(u); });
+importBtn.addEventListener('click', ()=>{ const input=document.createElement('input'); input.type='file'; input.accept='application/json'; input.onchange = (e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(Array.isArray(d)){ shortcuts = d.map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' })); saveAndRender(); } else alert('Invalid file format'); } catch(err){ alert('Invalid file'); } }; r.readAsText(f); }; input.click(); });
 
-/* ---------- initial render ---------- */
+/* initial render */
 renderShortcuts();
 </script>
 </body>
