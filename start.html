@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Start Page</title>
+<style>
+  :root {
+    --bg: #f5f6f7;
+    --card-bg: #fff;
+    --shadow: rgba(0, 0, 0, 0.1);
+    --accent: #4b8dd9;
+    --text: #111;
+  }
+  body.dark {
+    --bg: #1e1f22;
+    --card-bg: #2b2d31;
+    --shadow: rgba(0, 0, 0, 0.6);
+    --accent: #74b1ff;
+    --text: #e5e5e5;
+  }
+  body {
+    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: background 0.3s, color 0.3s;
+  }
+  header {
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  .btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .btn.small { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+  form {
+    margin-bottom: 2rem;
+  }
+  input[type="search"] {
+    width: 80%;
+    max-width: 400px;
+    padding: 0.6rem 0.8rem;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+  }
+  #shortcuts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    max-width: 600px;
+  }
+  .shortcut {
+    background: var(--card-bg);
+    border-radius: 10px;
+    box-shadow: 0 2px 6px var(--shadow);
+    padding: 1rem 0.5rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    cursor: grab;
+    transition: transform 0.1s;
+  }
+  .shortcut.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+  }
+  .shortcut img {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 0.5rem;
+  }
+  .shortcut span {
+    font-size: 0.9rem;
+    text-align: center;
+    word-break: break-word;
+  }
+  .shortcut button {
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    border: none;
+    background: none;
+    color: #aaa;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .shortcut-container {
+    position: relative;
+  }
+  #addForm {
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  #addForm input {
+    padding: 0.5rem;
+    font-size: 1rem;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    width: 80%;
+    max-width: 400px;
+  }
+  #addForm button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1.5rem;
+    cursor: pointer;
+  }
+  footer {
+    margin-top: 2rem;
+    font-size: 0.8rem;
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button id="toggleTheme" class="btn small">🌙 Dark Mode</button>
+  <div>
+    <button id="exportBtn" class="btn small">📤 Export</button>
+    <button id="importBtn" class="btn small">📥 Import</button>
+    <input type="file" id="fileInput" accept=".json" style="display:none" />
+  </div>
+</header>
+
+<form action="https://duckduckgo.com/" method="get">
+  <input type="search" name="q" placeholder="Search DuckDuckGo..." autofocus />
+</form>
+
+<div id="shortcuts"></div>
+
+<form id="addForm">
+  <input type="text" id="title" placeholder="Shortcut name" required />
+  <input type="url" id="url" placeholder="https://example.com" required />
+  <button type="submit">Add Shortcut</button>
+</form>
+
+<footer>
+  <span>Custom Start Page (local only, data stored in your browser)</span>
+</footer>
+
+<script>
+const container = document.getElementById("shortcuts");
+const addForm = document.getElementById("addForm");
+const fileInput = document.getElementById("fileInput");
+let shortcuts = JSON.parse(localStorage.getItem("shortcuts") || "[]");
+
+// ---- Rendering ----
+function render() {
+  container.innerHTML = "";
+  shortcuts.forEach((s, i) => {
+    const div = document.createElement("div");
+    div.className = "shortcut";
+    div.draggable = true;
+    div.dataset.index = i;
+
+    const favicon = document.createElement("img");
+    favicon.src = "https://www.google.com/s2/favicons?sz=64&domain=" + new URL(s.url).hostname;
+
+    const name = document.createElement("span");
+    name.textContent = s.title;
+    name.contentEditable = "true";
+    name.addEventListener("blur", () => {
+      shortcuts[i].title = name.textContent.trim() || "Untitled";
+      save();
+    });
+
+    const btn = document.createElement("button");
+    btn.textContent = "✕";
+    btn.onclick = e => {
+      e.stopPropagation();
+      removeShortcut(i);
+    };
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "shortcut-container";
+    wrapper.appendChild(btn);
+
+    div.appendChild(favicon);
+    div.appendChild(name);
+    div.onclick = e => {
+      if (e.target.tagName !== "BUTTON" && e.target !== name)
+        window.open(s.url, "_blank");
+    };
+
+    div.addEventListener("dragstart", dragStart);
+    div.addEventListener("dragover", dragOver);
+    div.addEventListener("drop", drop);
+    div.addEventListener("dragend", dragEnd);
+
+    wrapper.appendChild(div);
+    container.appendChild(wrapper);
+  });
+  save();
+}
+
+function save() {
+  localStorage.setItem("shortcuts", JSON.stringify(shortcuts));
+}
+
+function removeShortcut(i) {
+  shortcuts.splice(i, 1);
+  render();
+}
+
+addForm.onsubmit = e => {
+  e.preventDefault();
+  const title = document.getElementById("title").value.trim();
+  const url = document.getElementById("url").value.trim();
+  if (!title || !url) return;
+  shortcuts.push({ title, url });
+  addForm.reset();
+  render();
+};
+
+// ---- Drag & Drop ----
+let dragSrcIndex = null;
+function dragStart(e) {
+  dragSrcIndex = +e.currentTarget.dataset.index;
+  e.currentTarget.classList.add("dragging");
+}
+function dragOver(e) {
+  e.preventDefault();
+  const target = e.currentTarget;
+  const targetIndex = +target.dataset.index;
+  if (dragSrcIndex === targetIndex) return;
+  const temp = shortcuts[dragSrcIndex];
+  shortcuts.splice(dragSrcIndex, 1);
+  shortcuts.splice(targetIndex, 0, temp);
+  dragSrcIndex = targetIndex;
+  render();
+}
+function drop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove("dragging");
+  save();
+}
+function dragEnd(e) {
+  e.currentTarget.classList.remove("dragging");
+}
+
+// ---- Theme Toggle ----
+const themeBtn = document.getElementById("toggleTheme");
+let darkMode = localStorage.getItem("darkMode") === "true";
+applyTheme();
+themeBtn.onclick = () => {
+  darkMode = !darkMode;
+  localStorage.setItem("darkMode", darkMode);
+  applyTheme();
+};
+function applyTheme() {
+  document.body.classList.toggle("dark", darkMode);
+  themeBtn.textContent = darkMode ? "☀️ Light Mode" : "🌙 Dark Mode";
+}
+
+// ---- Export / Import ----
+const exportBtn = document.getElementById("exportBtn");
+const importBtn = document.getElementById("importBtn");
+
+exportBtn.onclick = () => {
+  const blob = new Blob([JSON.stringify(shortcuts, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "shortcuts_backup.json";
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+importBtn.onclick = () => fileInput.click();
+fileInput.onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (Array.isArray(data)) {
+        shortcuts = data;
+        save();
+        render();
+      } else {
+        alert("Invalid file format.");
+      }
+    } catch {
+      alert("Could not read file.");
+    }
+  };
+  reader.readAsText(file);
+};
+
+render();
+</script>
+</body>
+</html>
