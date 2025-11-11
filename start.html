@@ -1,154 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Custom Start Page</title>
 <style>
-:root {
-  --bg-light: #fafafa;
-  --bg-dark: #1e1e1e;
-  --fg-light: #000;
-  --fg-dark: #fff;
-  --card-bg-light: #fff;
-  --card-bg-dark: #2c2c2c;
+:root{
+  --bg-light:#fafafa;--bg-dark:#1e1e1e;
+  --fg-light:#000;--fg-dark:#fff;
+  --card-bg-light:#fff;--card-bg-dark:#2c2c2c;
 }
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background-color: var(--bg-light);
-  color: var(--fg-light);
-  transition: background-color 0.3s, color 0.3s;
-}
-body.dark { background-color: var(--bg-dark); color: var(--fg-dark); }
+body{margin:0;font-family:Arial,system-ui,sans-serif;background:var(--bg-light);color:var(--fg-light);transition:background .25s,color .25s}
+body.dark{background:var(--bg-dark);color:var(--fg-dark)}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 15px;position:sticky;top:0;background:inherit;z-index:10}
+#search-container{flex:0 0 80%;margin-right:10px}
+#search{width:100%;padding:8px 10px;border:1px solid #999;border-radius:5px;font-size:16px}
+#settings-button{background:none;border:none;font-size:22px;cursor:pointer;color:inherit;position:relative;z-index:20}
+#settings-menu{position:absolute;right:15px;top:45px;background:var(--card-bg-light);border:1px solid #ccc;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,.2);display:none;z-index:30}
+body.dark #settings-menu{background:var(--card-bg-dark);border-color:#555}
+#settings-menu button{display:block;width:100%;padding:10px 15px;border:none;background:none;color:inherit;text-align:left;cursor:pointer;font-size:15px}
+#settings-menu button:hover{background:rgba(0,0,0,.08)}
 
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 15px;
-  position: sticky;
-  top: 0;
-  background: inherit;
-  z-index: 10;
-}
+#shortcuts{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:15px;padding:15px}
 
-#search-container { flex: 0 0 80%; margin-right: 10px; }
-#search { width: 100%; padding: 8px 10px; border: 1px solid #999; border-radius: 5px; font-size: 16px; }
-#settings-button { background: none; border: none; font-size: 22px; cursor: pointer; color: inherit; position: relative; z-index: 20; }
+.shortcut{position:relative;text-align:center;background:var(--card-bg-light);border-radius:8px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.12);transition:transform .18s,box-shadow .18s;border:1px solid transparent;cursor:grab;user-select:none;touch-action:none}
+body.dark .shortcut{background:var(--card-bg-dark)}
+.shortcut:active{cursor:grabbing}
+.shortcut:hover{transform:scale(1.03)}
+.shortcut img{width:32px;height:32px;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto}
 
-#settings-menu {
-  position: absolute;
-  right: 15px;
-  top: 45px;
-  background: var(--card-bg-light);
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  display: none;
-  z-index: 30;
-}
-body.dark #settings-menu { background: var(--card-bg-dark); border-color: #555; }
+/* glow in edit mode */
+.shortcut.show-icons{box-shadow:0 0 16px 4px rgba(255,160,0,.65);}
 
-#settings-menu button {
-  display: block;
-  width: 100%;
-  padding: 10px 15px;
-  border: none;
-  background: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  font-size: 15px;
+/* separate edit/delete buttons */
+.shortcut .edit-btn,.shortcut .delete-btn{
+  position:absolute;background:rgba(0,0,0,.5);border:none;color:#fff;border-radius:4px;padding:3px 5px;cursor:pointer;font-size:12px;opacity:0;transition:opacity .18s,transform .18s;
+  -webkit-tap-highlight-color: transparent;
 }
-#settings-menu button:hover { background: rgba(0,0,0,0.1); }
+.shortcut.show-icons .edit-btn,.shortcut.show-icons .delete-btn{opacity:1}
+.shortcut .edit-btn{top:6px;left:6px}
+.shortcut .delete-btn{top:6px;right:6px}
+.shortcut .edit-btn:active,.shortcut .delete-btn:active{transform:scale(.95)}
 
-#shortcuts {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 15px;
-  padding: 15px;
-}
+/* drag over indicator */
+.drag-over{outline:2px dashed #666;transform:scale(1.02)}
 
-.shortcut {
-  position: relative;
-  text-align: center;
-  background: var(--card-bg-light);
-  border-radius: 8px;
-  padding: 15px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  transition: transform 0.2s, box-shadow 0.2s, border 0.2s;
-  cursor: grab;
-  user-select: none;
-}
-body.dark .shortcut { background: var(--card-bg-dark); }
-.shortcut:active { cursor: grabbing; }
-.shortcut:hover { transform: scale(1.05); }
-.shortcut img { width: 32px; height: 32px; margin-bottom: 8px; }
+/* modal */
+#add-dialog{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(5px);z-index:50;align-items:center;justify-content:center}
+#add-dialog form{background:var(--card-bg-light);color:inherit;padding:20px;border-radius:8px;min-width:280px;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+body.dark #add-dialog form{background:var(--card-bg-dark)}
+#add-dialog input{width:80%;margin:0 10%;margin-bottom:10px;padding:8px;border-radius:5px;border:1px solid #999}
+#add-dialog button{margin-right:8px;padding:8px 12px;border:none;border-radius:5px;cursor:pointer}
 
-/* Glow effect when edit mode active */
-.shortcut.show-icons { box-shadow: 0 0 15px 3px rgba(255,165,0,0.7); }
-
-/* Edit/Delete buttons positioned separately */
-.shortcut .edit-btn,
-.shortcut .delete-btn {
-  position: absolute;
-  background: rgba(0, 0, 0, 0.4);
-  border: none;
-  color: #fff;
-  border-radius: 4px;
-  padding: 2px 4px;
-  cursor: pointer;
-  font-size: 12px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.shortcut.show-icons .edit-btn,
-.shortcut.show-icons .delete-btn { opacity: 1; }
-.shortcut .edit-btn { top: 5px; left: 5px; }
-.shortcut .delete-btn { top: 5px; right: 5px; }
-
-#add-dialog {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(5px);
-  z-index: 50;
-  align-items: center;
-  justify-content: center;
-}
-#add-dialog form {
-  background: var(--card-bg-light);
-  color: inherit;
-  padding: 20px;
-  border-radius: 8px;
-  min-width: 280px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-}
-body.dark #add-dialog form { background: var(--card-bg-dark); }
-
-#add-dialog input {
-  width: 80%;
-  margin: 0 10%;
-  margin-bottom: 10px;
-  padding: 8px;
-  border-radius: 5px;
-  border: 1px solid #999;
-}
-
-#add-dialog button {
-  margin-right: 8px;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.drag-over { outline: 2px dashed #666; transform: scale(1.03); }
+/* small helper to make buttons smaller on small screens */
+.small-btn{font-size:0.9rem;padding:.3rem .6rem;border-radius:6px}
 </style>
 </head>
 <body>
-
 <header>
   <div id="search-container">
     <input id="search" type="text" placeholder="Search DuckDuckGo..." />
@@ -156,21 +64,21 @@ body.dark #add-dialog form { background: var(--card-bg-dark); }
   <button id="settings-button" title="Settings">⋮</button>
 </header>
 
-<div id="settings-menu">
-  <button id="toggle-theme">Toggle Dark/Light</button>
-  <button id="add-shortcut-btn">Add Shortcut</button>
-  <button id="import-btn">Import Shortcuts</button>
-  <button id="export-btn">Export Shortcuts</button>
+<div id="settings-menu" role="menu" aria-hidden="true">
+  <button id="toggle-theme" class="small-btn">Toggle Dark/Light</button>
+  <button id="add-shortcut-btn" class="small-btn">Add Shortcut</button>
+  <button id="import-btn" class="small-btn">Import Shortcuts</button>
+  <button id="export-btn" class="small-btn">Export Shortcuts</button>
 </div>
 
-<div id="shortcuts"></div>
+<div id="shortcuts" aria-live="polite"></div>
 
-<div id="add-dialog">
+<div id="add-dialog" aria-modal="true" role="dialog">
   <form id="add-form">
     <h3 id="dialog-title">Add Shortcut</h3>
     <input id="shortcut-name" type="text" placeholder="Name" required />
-    <input id="shortcut-url" type="url" placeholder="URL (https://…)" required />
-    <div style="text-align:right;">
+    <input id="shortcut-url" type="url" placeholder="URL (https://...)" required />
+    <div style="text-align:right">
       <button type="submit" id="add-save-btn">Add</button>
       <button type="button" id="cancel-add">Cancel</button>
     </div>
@@ -178,205 +86,324 @@ body.dark #add-dialog form { background: var(--card-bg-dark); }
 </div>
 
 <script>
-const search = document.getElementById('search');
-const shortcutsContainer = document.getElementById('shortcuts');
-const settingsButton = document.getElementById('settings-button');
-const settingsMenu = document.getElementById('settings-menu');
-const toggleThemeBtn = document.getElementById('toggle-theme');
-const addShortcutBtn = document.getElementById('add-shortcut-btn');
-const addDialog = document.getElementById('add-dialog');
-const addForm = document.getElementById('add-form');
-const cancelAdd = document.getElementById('cancel-add');
-const addSaveBtn = document.getElementById('add-save-btn');
-const dialogTitle = document.getElementById('dialog-title');
-const importBtn = document.getElementById('import-btn');
-const exportBtn = document.getElementById('export-btn');
+/* ---------- Utilities ---------- */
+const el = id => document.getElementById(id);
+const shortcutsEl = el('shortcuts');
+const search = el('search');
+const settingsButton = el('settings-button');
+const settingsMenu = el('settings-menu');
+const toggleThemeBtn = el('toggle-theme');
+const addShortcutBtn = el('add-shortcut-btn');
+const addDialog = el('add-dialog');
+const addForm = el('add-form');
+const cancelAdd = el('cancel-add');
+const addSaveBtn = el('add-save-btn');
+const dialogTitle = el('dialog-title');
+const importBtn = el('import-btn');
+const exportBtn = el('export-btn');
 
-let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]');
-shortcuts = shortcuts.map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' }));
+let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]')
+  .map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' }));
 
-let longPressTimer, isDragging = false;
-let editIndex = null; // tracks which shortcut is being edited
+let editIndex = null;
 
-const renderShortcuts = () => {
-  shortcutsContainer.innerHTML = '';
+/* single document-level click handler to close edit-mode if clicking outside tiles/settings */
+document.addEventListener('click', (ev) => {
+  // if click is inside settings menu or settings button, leave menu handling to its toggler
+  if (settingsButton.contains(ev.target) || settingsMenu.contains(ev.target)) return;
+  // if click is inside a tile (or its edit/delete buttons), do nothing here (tile logic handles it)
+  if (ev.target.closest('.shortcut')) return;
+
+  // otherwise remove 'show-icons' from all tiles (exit edit mode)
+  document.querySelectorAll('.shortcut.show-icons').forEach(t => t.classList.remove('show-icons'));
+
+  // also hide the settings menu if clicking elsewhere
+  settingsMenu.style.display = 'none';
+});
+
+/* ---------- Render / Re-render ---------- */
+function renderShortcuts(){
+  shortcutsEl.innerHTML = '';
   shortcuts.forEach((s, i) => {
-    const el = document.createElement('div');
-    el.className = 'shortcut';
-    el.draggable = true;
-    el.dataset.index = i;
+    const tile = document.createElement('div');
+    tile.className = 'shortcut';
+    tile.draggable = true;
+    tile.dataset.index = i;
 
+    // favicon
     const favicon = document.createElement('img');
-    const domain = s.url ? new URL(s.url).origin : '';
-    favicon.src = `https://www.google.com/s2/favicons?sz=64&domain_url=${domain}`;
+    try {
+      const domain = s.url ? new URL(s.url).origin : '';
+      favicon.src = `https://www.google.com/s2/favicons?sz=64&domain_url=${domain}`;
+    } catch(_) {
+      favicon.src = '';
+    }
 
+    // label
     const label = document.createElement('div');
-    label.innerText = s.name || 'Unnamed';
+    label.textContent = s.name || 'Unnamed';
 
-    // Edit button
+    // edit & delete buttons (separate corners)
     const editBtn = document.createElement('button');
     editBtn.className = 'edit-btn';
     editBtn.innerText = '✏️';
     editBtn.title = 'Edit';
-    editBtn.onclick = e => {
-      e.stopPropagation();
-      editIndex = i;
-      dialogTitle.innerText = 'Edit Shortcut';
-      addSaveBtn.innerText = 'Save';
-      document.getElementById('shortcut-name').value = s.name;
-      document.getElementById('shortcut-url').value = s.url;
-      addDialog.style.display = 'flex';
-    };
 
-    // Delete button
     const delBtn = document.createElement('button');
     delBtn.className = 'delete-btn';
     delBtn.innerText = '❌';
     delBtn.title = 'Delete';
-    delBtn.onclick = e => {
-      e.stopPropagation();
+
+    // attach handlers that fully consume events (both mouse and touch)
+    function consumeEvent(e){ e.stopPropagation(); e.preventDefault && e.preventDefault(); return false; }
+
+    // edit: open modal prefilled; must not propagate to tile tap
+    editBtn.addEventListener('click', (ev) => {
+      consumeEvent(ev);
+      openEditModal(i);
+    }, {passive:false});
+    // ensure touch events on button don't fall through to tile tap
+    editBtn.addEventListener('touchstart', consumeEvent, {passive:false});
+    editBtn.addEventListener('touchend', consumeEvent, {passive:false});
+
+    // delete: confirm + remove
+    delBtn.addEventListener('click', (ev) => {
+      consumeEvent(ev);
       if (confirm('Delete this shortcut?')) {
-        shortcuts.splice(i, 1);
-        localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
-        renderShortcuts();
+        shortcuts.splice(i,1);
+        saveAndRender();
       }
-    };
+    }, {passive:false});
+    delBtn.addEventListener('touchstart', consumeEvent, {passive:false});
+    delBtn.addEventListener('touchend', consumeEvent, {passive:false});
 
-    el.appendChild(editBtn);
-    el.appendChild(delBtn);
-    el.appendChild(favicon);
-    el.appendChild(label);
+    tile.appendChild(editBtn);
+    tile.appendChild(delBtn);
+    tile.appendChild(favicon);
+    tile.appendChild(label);
 
-    // Long press + tap logic
+    /* ---------- Touch / Mouse interplay: long-press, tap, touch-drag fallback ---------- */
     let touchStartTime = 0;
-    el.addEventListener('touchstart', e => {
-      touchStartTime = Date.now();
+    let startX = 0, startY = 0;
+    let touchDragging = false;
+    let dragOverTarget = null;
+
+    // helper to clear long-press timer
+    let longPressTimer = null;
+    const startLongPress = () => {
+      clearLongPress();
       longPressTimer = setTimeout(() => {
-        el.classList.add('show-icons');
+        // show edit icons for this tile
+        tile.classList.add('show-icons');
       }, 600);
-    });
+    };
+    const clearLongPress = () => { if (longPressTimer){ clearTimeout(longPressTimer); longPressTimer = null; } };
 
-    el.addEventListener('touchmove', e => {
-      isDragging = true;
-      clearTimeout(longPressTimer);
-    });
+    // touchstart: start the timer, record coords
+    tile.addEventListener('touchstart', (ev) => {
+      touchDragging = false;
+      touchStartTime = Date.now();
+      const t = ev.touches[0];
+      startX = t.clientX; startY = t.clientY;
+      startLongPress();
+    }, {passive:true});
 
-    el.addEventListener('touchend', e => {
-      clearTimeout(longPressTimer);
-      if (!isDragging && (Date.now() - touchStartTime) < 500) {
+    // touchmove: if significant movement, treat as dragging and cancel long-press; highlight drop targets
+    tile.addEventListener('touchmove', (ev) => {
+      const t = ev.touches[0];
+      const dx = Math.abs(t.clientX - startX), dy = Math.abs(t.clientY - startY);
+      if ((dx > 8 || dy > 8)) {
+        touchDragging = true;
+        clearLongPress();
+
+        // highlight potential target tile under finger
+        const under = document.elementFromPoint(t.clientX, t.clientY);
+        const potential = under ? under.closest('.shortcut') : null;
+        if (potential && potential !== tile) {
+          // add drag-over to potential, remove from previous
+          if (dragOverTarget && dragOverTarget !== potential) dragOverTarget.classList.remove('drag-over');
+          dragOverTarget = potential;
+          dragOverTarget.classList.add('drag-over');
+        } else {
+          if (dragOverTarget) { dragOverTarget.classList.remove('drag-over'); dragOverTarget = null; }
+        }
+      }
+    }, {passive:true});
+
+    // touchend: if we were dragging, perform reorder if necessary; else if short tap and not over button => open
+    tile.addEventListener('touchend', (ev) => {
+      clearLongPress();
+      // remove any drag-over marks
+      if (dragOverTarget) dragOverTarget.classList.remove('drag-over');
+
+      // if touchDragging, treat as reorder gesture
+      if (touchDragging) {
+        const changed = ev.changedTouches[0];
+        const under = document.elementFromPoint(changed.clientX, changed.clientY);
+        const targetTile = under ? under.closest('.shortcut') : null;
+        if (targetTile && targetTile !== tile) {
+          const fromIndex = parseInt(tile.dataset.index,10);
+          const toIndex = parseInt(targetTile.dataset.index,10);
+          if (!Number.isNaN(fromIndex) && !Number.isNaN(toIndex) && fromIndex !== toIndex) {
+            const moved = shortcuts.splice(fromIndex,1)[0];
+            shortcuts.splice(toIndex,0,moved);
+            saveAndRender();
+          }
+        }
+        touchDragging = false;
+        return;
+      }
+
+      // not a drag; determine if touchend happened over a button (edit/delete)
+      const changed = ev.changedTouches[0];
+      const elementAt = document.elementFromPoint(changed.clientX, changed.clientY);
+      if (elementAt && (elementAt.closest('.edit-btn') || elementAt.closest('.delete-btn'))) {
+        // let the button handlers run (they already stopped propagation)
+        return;
+      }
+
+      // short tap -> open url
+      const elapsed = Date.now() - touchStartTime;
+      if (elapsed < 500 && !touchDragging) {
         if (s.url) window.open(s.url, '_blank');
       }
-      isDragging = false;
+    }, {passive:false});
+
+    /* ---------- Mouse behaviors (desktop) ---------- */
+    // click for mouse; ignore if click was on edit/delete button
+    tile.addEventListener('click', (ev) => {
+      if (ev.target.closest('.edit-btn') || ev.target.closest('.delete-btn')) return;
+      if (s.url) window.open(s.url, '_blank');
     });
 
-    // Mouse click
-    el.addEventListener('click', e => {
-      if (!isDragging && !e.target.classList.contains('edit-btn') && !e.target.classList.contains('delete-btn')) {
-        if (s.url) window.open(s.url, '_blank');
+    // drag & drop for desktop
+    tile.addEventListener('dragstart', (ev) => {
+      ev.dataTransfer.setData('text/plain', tile.dataset.index);
+      tile.classList.add('dragging');
+    });
+    tile.addEventListener('dragend', () => {
+      tile.classList.remove('dragging');
+      // clear any drag-over visuals
+      document.querySelectorAll('.drag-over').forEach(n => n.classList.remove('drag-over'));
+    });
+
+    tile.addEventListener('dragover', (ev) => {
+      ev.preventDefault();
+      // highlight as a drop target (but don't highlight itself)
+      if (!tile.classList.contains('dragging')) tile.classList.add('drag-over');
+    });
+    tile.addEventListener('dragleave', () => tile.classList.remove('drag-over'));
+    tile.addEventListener('drop', (ev) => {
+      ev.preventDefault();
+      const from = parseInt(ev.dataTransfer.getData('text/plain'),10);
+      const to = parseInt(tile.dataset.index,10);
+      tile.classList.remove('drag-over');
+      if (!Number.isNaN(from) && !Number.isNaN(to) && from !== to) {
+        const moved = shortcuts.splice(from,1)[0];
+        shortcuts.splice(to,0,moved);
+        saveAndRender();
       }
     });
 
-    // Drag & drop
-    el.addEventListener('dragstart', e => { isDragging = true; el.classList.add('dragging'); e.dataTransfer.setData('text/plain', i); });
-    el.addEventListener('dragend', () => { isDragging = false; el.classList.remove('dragging'); });
-    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
-    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-    el.addEventListener('drop', e => {
-      e.preventDefault();
-      const from = parseInt(e.dataTransfer.getData('text/plain'));
-      const to = parseInt(el.dataset.index);
-      el.classList.remove('drag-over');
-      if (from !== to) {
-        const moved = shortcuts.splice(from, 1)[0];
-        shortcuts.splice(to, 0, moved);
-        localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
-        renderShortcuts();
-      }
-    });
-
-    shortcutsContainer.appendChild(el);
+    shortcutsEl.appendChild(tile);
   });
-};
-renderShortcuts();
+  // update dataset.index for all tiles after re-render
+  document.querySelectorAll('.shortcut').forEach((t,idx)=> t.dataset.index = idx);
+}
 
-// Search
-search.addEventListener('keydown', e => {
+/* ---------- Helpers ---------- */
+function saveAndRender(){
+  localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
+  renderShortcuts();
+}
+
+/* ---------- Search ---------- */
+search.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const q = encodeURIComponent(search.value.trim());
-    window.location.href = `https://duckduckgo.com/?q=${q}`;
+    if (q) window.location.href = `https://duckduckgo.com/?q=${q}`;
   }
 });
 
-// Settings menu
-settingsButton.addEventListener('click', () => {
-  settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
-});
-window.addEventListener('click', e => {
-  if (!settingsButton.contains(e.target) && !settingsMenu.contains(e.target)) {
-    settingsMenu.style.display = 'none';
-  }
+/* ---------- Settings menu toggle ---------- */
+settingsButton.addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  const visible = settingsMenu.style.display === 'block';
+  settingsMenu.style.display = visible ? 'none' : 'block';
 });
 
-// Theme toggle
+/* ---------- Theme toggle ---------- */
 if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
 toggleThemeBtn.addEventListener('click', () => {
-  document.body.classList.toggle('dark');
+  const dark = !document.body.classList.toggle('dark');
+  // toggling returns false/void; set storage based on class
   localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
 });
 
-// Add/Edit Shortcut dialog
+/* ---------- Add / Edit Modal handling ---------- */
+function openEditModal(index){
+  editIndex = index;
+  dialogTitle.textContent = 'Edit Shortcut';
+  addSaveBtn.textContent = 'Save';
+  el('shortcut-name').value = shortcuts[index].name;
+  el('shortcut-url').value = shortcuts[index].url;
+  addDialog.style.display = 'flex';
+}
 addShortcutBtn.addEventListener('click', () => {
   editIndex = null;
-  dialogTitle.innerText = 'Add Shortcut';
-  addSaveBtn.innerText = 'Add';
+  dialogTitle.textContent = 'Add Shortcut';
+  addSaveBtn.textContent = 'Add';
   addForm.reset();
   addDialog.style.display = 'flex';
 });
-cancelAdd.addEventListener('click', () => addDialog.style.display = 'none');
-addForm.addEventListener('submit', e => {
-  e.preventDefault();
-  const name = document.getElementById('shortcut-name').value.trim();
-  const url = document.getElementById('shortcut-url').value.trim();
+cancelAdd.addEventListener('click', () => {
+  addDialog.style.display = 'none';
+  editIndex = null;
+});
+addForm.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const name = el('shortcut-name').value.trim();
+  const url = el('shortcut-url').value.trim();
   if (!name || !url) return;
-
   if (editIndex !== null) {
     shortcuts[editIndex] = { name, url };
   } else {
     shortcuts.push({ name, url });
   }
-  localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
-  renderShortcuts();
+  saveAndRender();
   addDialog.style.display = 'none';
-  addForm.reset();
   editIndex = null;
 });
 
-// Export/Import
+/* ---------- Export / Import ---------- */
 exportBtn.addEventListener('click', () => {
-  const data = JSON.stringify(shortcuts);
-  const blob = new Blob([data], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(shortcuts,null,2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = 'shortcuts.json'; a.click();
   URL.revokeObjectURL(url);
 });
 importBtn.addEventListener('click', () => {
-  const input = document.createElement('input'); input.type = 'file'; input.accept = 'application/json';
-  input.onchange = e => {
-    const file = e.target.files[0]; const reader = new FileReader();
-    reader.onload = () => {
+  const input = document.createElement('input'); input.type='file'; input.accept='application/json';
+  input.onchange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
       try {
-        const imported = JSON.parse(reader.result);
-        if (Array.isArray(imported)) {
-          shortcuts = imported.map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' }));
-          localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
-          renderShortcuts();
-        }
-      } catch { alert('Invalid file format.'); }
+        const data = JSON.parse(r.result);
+        if (Array.isArray(data)) {
+          shortcuts = data.map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' }));
+          saveAndRender();
+        } else alert('Invalid file format');
+      } catch(err){ alert('Invalid file'); }
     };
-    reader.readAsText(file);
+    r.readAsText(f);
   };
   input.click();
 });
+
+/* ---------- initial render ---------- */
+renderShortcuts();
 </script>
 </body>
 </html>
