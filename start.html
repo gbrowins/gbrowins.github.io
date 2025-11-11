@@ -99,6 +99,7 @@
   }
 
   .shortcut {
+    position: relative;
     text-align: center;
     background: var(--card-bg-light);
     border-radius: 8px;
@@ -122,6 +123,30 @@
     width: 32px;
     height: 32px;
     margin-bottom: 8px;
+  }
+
+  .shortcut .edit-icons {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: flex;
+    gap: 5px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .shortcut.show-icons .edit-icons {
+    opacity: 1;
+  }
+
+  .shortcut .edit-icons button {
+    background: rgba(0, 0, 0, 0.4);
+    border: none;
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 4px;
+    cursor: pointer;
+    font-size: 12px;
   }
 
   #add-dialog {
@@ -213,12 +238,12 @@
   const exportBtn = document.getElementById('export-btn');
 
   let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]');
-
-  // Backward compatibility: normalize old shortcuts
   shortcuts = shortcuts.map(s => ({
     name: s.name || s.title || 'Unnamed',
     url: s.url || s.href || ''
   }));
+
+  let longPressTimer;
 
   const renderShortcuts = () => {
     shortcutsContainer.innerHTML = '';
@@ -235,14 +260,66 @@
       const label = document.createElement('div');
       label.innerText = s.name || 'Unnamed';
 
+      // Edit/Delete buttons
+      const editIcons = document.createElement('div');
+      editIcons.className = 'edit-icons';
+
+      const editBtn = document.createElement('button');
+      editBtn.innerText = '✏️';
+      editBtn.title = 'Edit';
+      editBtn.onclick = e => {
+        e.stopPropagation();
+        const newName = prompt('Edit shortcut name:', s.name);
+        const newUrl = prompt('Edit shortcut URL:', s.url);
+        if (newName && newUrl) {
+          shortcuts[i] = { name: newName, url: newUrl };
+          localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
+          renderShortcuts();
+        }
+      };
+
+      const delBtn = document.createElement('button');
+      delBtn.innerText = '❌';
+      delBtn.title = 'Delete';
+      delBtn.onclick = e => {
+        e.stopPropagation();
+        if (confirm('Delete this shortcut?')) {
+          shortcuts.splice(i, 1);
+          localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
+          renderShortcuts();
+        }
+      };
+
+      editIcons.appendChild(editBtn);
+      editIcons.appendChild(delBtn);
+
+      el.appendChild(editIcons);
       el.appendChild(favicon);
       el.appendChild(label);
 
       el.addEventListener('click', e => {
-        if (!el.classList.contains('dragging') && s.url)
-          window.open(s.url, '_self');
+        if (!el.classList.contains('dragging'))
+          window.open(s.url, '_blank');
       });
 
+      // Long press logic
+      el.addEventListener('touchstart', () => {
+        longPressTimer = setTimeout(() => {
+          el.classList.add('show-icons');
+        }, 600);
+      });
+      el.addEventListener('touchend', () => clearTimeout(longPressTimer));
+      el.addEventListener('mousedown', () => {
+        longPressTimer = setTimeout(() => {
+          el.classList.add('show-icons');
+        }, 600);
+      });
+      el.addEventListener('mouseup', () => clearTimeout(longPressTimer));
+      window.addEventListener('click', e => {
+        if (!el.contains(e.target)) el.classList.remove('show-icons');
+      });
+
+      // Drag & drop logic
       el.addEventListener('dragstart', e => {
         el.classList.add('dragging');
         e.dataTransfer.setData('text/plain', i);
@@ -296,12 +373,8 @@
       document.body.classList.contains('dark') ? 'dark' : 'light');
   });
 
-  addShortcutBtn.addEventListener('click', () => {
-    addDialog.style.display = 'flex';
-  });
-  cancelAdd.addEventListener('click', () => {
-    addDialog.style.display = 'none';
-  });
+  addShortcutBtn.addEventListener('click', () => addDialog.style.display = 'flex');
+  cancelAdd.addEventListener('click', () => addDialog.style.display = 'none');
   addForm.addEventListener('submit', e => {
     e.preventDefault();
     const name = document.getElementById('shortcut-name').value.trim();
