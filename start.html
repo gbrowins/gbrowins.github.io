@@ -21,6 +21,13 @@ body.dark #settings-menu{background:var(--card-bg-dark);border-color:#555}
 #settings-menu button{display:block;width:100%;padding:10px 15px;border:none;background:none;color:inherit;text-align:left;cursor:pointer;font-size:15px}
 #settings-menu button:hover{background:rgba(0,0,0,.08)}
 
+/* Disable right-click menu for tile images */
+.shortcut img {
+  pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
 #shortcuts{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:15px;padding:15px}
 
 .shortcut{position:relative;text-align:center;background:var(--card-bg-light);border-radius:8px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.12);transition:transform .18s,box-shadow .18s;border:1px solid transparent;cursor:grab;user-select:none;touch-action:none}
