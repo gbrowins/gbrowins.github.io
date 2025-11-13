@@ -72,6 +72,27 @@ body.dark #add-dialog form{background:var(--card-bg-dark)}
 #add-dialog input{width:80%;margin:0 10%;margin-bottom:10px;padding:8px;border-radius:5px;border:1px solid #999}
 #add-dialog button{margin-right:8px;padding:8px 12px;border:none;border-radius:5px;cursor:pointer}
 .small-btn{font-size:0.9rem;padding:.3rem .6rem;border-radius:6px}
+
+.shortcut.add-tile {
+  background: none;
+  border: 2px dashed #999;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s, transform .18s;
+}
+.shortcut.add-tile:hover {
+  background: rgba(0,0,0,0.05);
+  transform: scale(1.03);
+}
+body.dark .shortcut.add-tile {
+  border-color: #777;
+}
+body.dark .shortcut.add-tile:hover {
+  background: rgba(255,255,255,0.08);
+}
+
 </style>
 </head>
 <body>
@@ -277,6 +298,20 @@ function renderShortcuts(){
   });
   // ensure dataset indices are correct
   document.querySelectorAll('.shortcut').forEach((t,idx)=> t.dataset.index = idx);
+
+  // --- Add the persistent "Add New" tile at the end ---
+  const addTile = document.createElement('div');
+  addTile.className = 'shortcut add-tile';
+  addTile.innerHTML = `<div style="font-size:36px;line-height:1;margin-bottom:8px;">＋</div><div>Add New...</div>`;
+  addTile.addEventListener('click', () => {
+    editIndex = null;
+    dialogTitle.textContent = 'Add Shortcut';
+    addSaveBtn.textContent = 'Add';
+    addForm.reset();
+    addDialog.style.display = 'flex';
+    setTimeout(() => $('shortcut-name').focus(), 100);
+  });
+  shortcutsEl.appendChild(addTile);
 }
 
 /* save + render */
