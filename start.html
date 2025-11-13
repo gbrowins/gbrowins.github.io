@@ -145,6 +145,8 @@ const dialogTitle = $('dialog-title');
 const importBtn = $('import-btn');
 const exportBtn = $('export-btn');
 
+let suppressClickUntil = 0;
+
 let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]')
   .map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' }));
 let editIndex = null;
@@ -188,9 +190,14 @@ function renderShortcuts(){
       openEditModal(i);
     }, {passive:false});
     delBtn.addEventListener('pointerup', (ev) => {
-      ev.stopPropagation();
+      ev.stopImmediatePropagation();
       ev.preventDefault();
-      if (confirm('Delete this shortcut?')) { shortcuts.splice(i,1); saveAndRender(); }
+      if (confirm('Delete this shortcut?')) { 
+        // suppress the next click for a short window so a reflowed Add tile can't receive it
+        suppressClickUntil = Date.now() + 1000;
+        shortcuts.splice(i,1); 
+        saveAndRender(); 
+      }
     }, {passive:false});
 
     tile.appendChild(editBtn);
@@ -310,6 +317,13 @@ function renderShortcuts(){
   addTile.className = 'shortcut add-tile';
   addTile.innerHTML = `<div style="font-size:36px;line-height:1;margin-bottom:8px;">＋</div><div>Add New...</div>`;
   addTile.addEventListener('click', () => {
+    // ignore a single follow-up click that may arrive immediately after a delete
+    if (Date.now() < suppressClickUntil) {
+      ev.stopPropagation();
+      ev.preventDefault();
+      return;
+    }
+    
     editIndex = null;
     dialogTitle.textContent = 'Add Shortcut';
     addSaveBtn.textContent = 'Add';
