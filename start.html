@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="/favicon.png">
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Custom Start Page (fixed pointer handling)</title>
+<title>Gregg's Mobile Home Page</title>
 <style>
 :root{
   --bg-light:#fafafa;--bg-dark:#1e1e1e;
@@ -72,7 +73,7 @@ body.dark #add-dialog form{background:var(--card-bg-dark)}
   <form id="add-form">
     <h3 id="dialog-title">Add Shortcut</h3>
     <input id="shortcut-name" type="text" placeholder="Name" required />
-    <input id="shortcut-url" type="url" placeholder="URL (https://...)" required />
+    <input id="shortcut-url" type="url" value="https://www.example.com" required />
     <div style="text-align:right">
       <button type="submit" id="add-save-btn">Add</button>
       <button type="button" id="cancel-add">Cancel</button>
