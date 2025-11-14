@@ -35,9 +35,21 @@ body.dark .shortcut{background:var(--card-bg-dark)}
 
 /* separate edit/delete buttons */
 .shortcut .edit-btn,.shortcut .delete-btn{
-  position:absolute;background:rgba(0,0,0,.5);border:none;color:#fff;border-radius:4px;padding:3px 5px;cursor:pointer;font-size:12px;opacity:0;transition:opacity .18s,transform .12s;z-index:5;pointer-events:auto;touch-action:none
+  position:absolute;
+  background:rgba(0,0,0,.5);
+  border:none;
+  color:#fff;
+  border-radius:4px;
+  padding:3px 5px;
+  cursor:pointer;
+  font-size:12px;
+  opacity:0;
+  transition:opacity .18s,transform .12s;
+  z-index:5;
+  pointer-events:none;
+  touch-action:none;
 }
-.shortcut.show-icons .edit-btn,.shortcut.show-icons .delete-btn{opacity:1}
+.shortcut.show-icons .edit-btn,.shortcut.show-icons .delete-btn{opacity:1; pointer-events:auto;}
 .shortcut .edit-btn{top:6px;left:6px}
 .shortcut .delete-btn{top:6px;right:6px}
 .shortcut .edit-btn:active,.shortcut .delete-btn:active{transform:scale(.95)}
