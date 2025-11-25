@@ -350,7 +350,7 @@ function renderShortcuts(){
 function saveAndRender(){ localStorage.setItem('shortcuts', JSON.stringify(shortcuts)); renderShortcuts(); }
 
 /* search */
-search.addEventListener('keydown', (e) => { if (e.key==='Enter'){ const q=encodeURIComponent(search.value.trim()); if (q) window.location.href=`https://duckduckgo.com/?q=${q}`;} });
+search.addEventListener('keydown', (e) => { if (e.key==='Enter'){ const q=encodeURIComponent(search.value.trim()); if (q) window.open(`https://duckduckgo.com/?q=${q}`, '_blank', 'noopener,noreferrer');} });
 
 /* settings menu */
 settingsButton.addEventListener('click', (ev)=>{ ev.stopPropagation(); settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block'; });
