@@ -422,12 +422,22 @@ function sgRender(){
     li.textContent = text;
     li.setAttribute('role','option');
     if (i === sgActive) li.classList.add('active');
-    li.addEventListener('mouseenter', () => { sgActive = i; sgRender(); });
+    li.addEventListener('mouseenter', () => sgSetActive(i));
     li.addEventListener('mousedown', (e) => { e.preventDefault(); }); // keep focus on input so the list doesn't vanish before click fires
     li.addEventListener('click', () => { sgChoose(text); });
     suggestList.appendChild(li);
   });
   suggestList.style.display = 'block';
+}
+function sgSetActive(i){
+  // toggles the highlight class only -- never rebuilds the DOM. Rebuilding on every
+  // hover was corrupting the mousedown->mouseup->click sequence (the very element
+  // being clicked was getting torn down and replaced mid-gesture).
+  if (sgActive === i) return;
+  sgActive = i;
+  Array.from(suggestList.children).forEach((li, idx) => {
+    li.classList.toggle('active', idx === i);
+  });
 }
 function sgChoose(text){
   search.value = text;
@@ -478,8 +488,8 @@ searchClear.addEventListener('click', () => {
 
 search.addEventListener('keydown', (e) => {
   if (suggestList.style.display === 'block'){
-    if (e.key === 'ArrowDown'){ e.preventDefault(); sgActive = Math.min(sgActive+1, sgItems.length-1); sgRender(); return; }
-    if (e.key === 'ArrowUp'){ e.preventDefault(); sgActive = Math.max(sgActive-1, 0); sgRender(); return; }
+    if (e.key === 'ArrowDown'){ e.preventDefault(); sgSetActive(Math.min(sgActive+1, sgItems.length-1)); return; }
+    if (e.key === 'ArrowUp'){ e.preventDefault(); sgSetActive(Math.max(sgActive-1, 0)); return; }
     if (e.key === 'Escape'){ sgClose(); return; }
     if (e.key === 'Enter' && sgActive >= 0 && sgItems[sgActive]){ e.preventDefault(); sgChoose(sgItems[sgActive]); return; }
   }
