@@ -14,8 +14,23 @@
 body{margin:0;font-family:Arial,system-ui,sans-serif;background:var(--bg-light);color:var(--fg-light);transition:background .25s,color .25s}
 body.dark{background:var(--bg-dark);color:var(--fg-dark)}
 header{display:flex;align-items:center;justify-content:space-between;padding:10px 15px;position:sticky;top:0;background:inherit;z-index:10}
-#search-container{flex:0 0 80%;margin-right:10px}
-#search{width:100%;padding:8px 10px;border:1px solid #999;border-radius:5px;font-size:16px}
+#search-container{flex:0 0 80%;margin-right:10px;position:relative}
+#search{width:100%;padding:8px 34px 8px 10px;border:1px solid #999;border-radius:5px;font-size:16px;box-sizing:border-box}
+#search-clear{
+  display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:inherit;opacity:.55;cursor:pointer;
+  font-size:20px;line-height:1;padding:4px 6px;
+}
+#search-clear:hover{opacity:.9}
+#search-suggestions{
+  position:absolute;left:0;right:0;top:100%;margin-top:4px;
+  list-style:none;padding:4px 0;background:var(--card-bg-light);
+  border:1px solid #ccc;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.2);
+  max-height:260px;overflow-y:auto;z-index:25;display:none;font-size:15px;
+}
+body.dark #search-suggestions{background:var(--card-bg-dark);border-color:#555}
+#search-suggestions li{padding:8px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#search-suggestions li.active,#search-suggestions li:hover{background:rgba(128,128,128,.25)}
 #settings-button{background:none;border:none;font-size:22px;cursor:pointer;color:inherit;position:relative;z-index:20}
 #settings-menu{position:absolute;right:15px;top:45px;background:var(--card-bg-light);border:1px solid #ccc;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,.2);display:none;z-index:30}
 body.dark #settings-menu{background:var(--card-bg-dark);border-color:#555}
@@ -119,7 +134,11 @@ body.dark .shortcut.add-tile:hover {
 </head>
 <body>
 <header>
-  <div id="search-container"><input id="search" type="text" placeholder="Search DuckDuckGo..." /></div>
+  <div id="search-container">
+    <input id="search" type="text" placeholder="Search DuckDuckGo..." autocomplete="off" />
+    <button id="search-clear" type="button" aria-label="Clear search" title="Clear">&times;</button>
+    <ul id="search-suggestions" role="listbox"></ul>
+  </div>
   <button id="settings-button" title="Settings">⋮</button>
 </header>
 
@@ -150,6 +169,8 @@ body.dark .shortcut.add-tile:hover {
 const $ = id => document.getElementById(id);
 const shortcutsEl = $('shortcuts');
 const search = $('search');
+const searchClear = $('search-clear');
+const suggestList = $('search-suggestions');
 const settingsButton = $('settings-button');
 const settingsMenu = $('settings-menu');
 const toggleThemeBtn = $('toggle-theme');
@@ -374,8 +395,97 @@ function renderShortcuts(){
 /* save + render */
 function saveAndRender(){ localStorage.setItem('shortcuts', JSON.stringify(shortcuts)); renderShortcuts(); }
 
-/* search */
-search.addEventListener('keydown', (e) => { if (e.key==='Enter'){ const q=encodeURIComponent(search.value.trim()); if (q) window.open(`https://duckduckgo.com/?q=${q}`, '_blank', 'noopener,noreferrer');} });
+/* search + live DuckDuckGo suggestions (via our own Cloudflare Worker proxy) */
+const WORKER_URL = 'https://ddg-suggest.gbrowins.workers.dev'; // <-- set this after deploying the Worker
+
+let sgItems = [];       // current suggestion strings
+let sgActive = -1;      // keyboard-highlighted index
+let sgDebounce = null;
+let sgAbort = null;
+let sgSeq = 0;
+const sgCache = new Map(); // session-only cache: query -> suggestions[]
+
+function sgClose(){
+  suggestList.style.display = 'none';
+  suggestList.innerHTML = '';
+  sgItems = [];
+  sgActive = -1;
+}
+function sgRender(){
+  suggestList.innerHTML = '';
+  if (!sgItems.length){ sgClose(); return; }
+  sgItems.forEach((text, i) => {
+    const li = document.createElement('li');
+    li.textContent = text;
+    li.setAttribute('role','option');
+    if (i === sgActive) li.classList.add('active');
+    li.addEventListener('mouseenter', () => { sgActive = i; sgRender(); });
+    li.addEventListener('mousedown', (e) => { e.preventDefault(); sgChoose(text); });
+    suggestList.appendChild(li);
+  });
+  suggestList.style.display = 'block';
+}
+function sgChoose(text){
+  search.value = text;
+  updateClearBtn();
+  sgClose();
+  runSearch(text);
+}
+function runSearch(q){
+  const query = encodeURIComponent(q.trim());
+  if (query) window.open(`https://duckduckgo.com/?q=${query}`, '_blank', 'noopener,noreferrer');
+}
+function sgFetch(q){
+  if (sgCache.has(q)){ sgItems = sgCache.get(q); sgActive = -1; sgRender(); return; }
+  if (sgAbort) sgAbort.abort();
+  sgAbort = new AbortController();
+  const seq = ++sgSeq;
+  fetch(`${WORKER_URL}?q=${encodeURIComponent(q)}`, { signal: sgAbort.signal })
+    .then(r => r.json())
+    .then(data => {
+      if (seq !== sgSeq) return; // a newer request superseded this one
+      const suggestions = Array.isArray(data) && Array.isArray(data[1]) ? data[1] : [];
+      sgCache.set(q, suggestions);
+      sgItems = suggestions;
+      sgActive = -1;
+      sgRender();
+    })
+    .catch(() => { if (seq === sgSeq) sgClose(); }); // covers aborts + network errors alike
+}
+
+function updateClearBtn(){
+  searchClear.style.display = search.value ? 'block' : 'none';
+}
+
+search.addEventListener('input', () => {
+  const q = search.value.trim();
+  updateClearBtn();
+  clearTimeout(sgDebounce);
+  if (!q){ sgClose(); return; }
+  sgDebounce = setTimeout(() => sgFetch(q), 200);
+});
+
+searchClear.addEventListener('click', () => {
+  search.value = '';
+  updateClearBtn();
+  sgClose();
+  search.focus();
+});
+
+search.addEventListener('keydown', (e) => {
+  if (suggestList.style.display === 'block'){
+    if (e.key === 'ArrowDown'){ e.preventDefault(); sgActive = Math.min(sgActive+1, sgItems.length-1); sgRender(); return; }
+    if (e.key === 'ArrowUp'){ e.preventDefault(); sgActive = Math.max(sgActive-1, 0); sgRender(); return; }
+    if (e.key === 'Escape'){ sgClose(); return; }
+    if (e.key === 'Enter' && sgActive >= 0 && sgItems[sgActive]){ e.preventDefault(); sgChoose(sgItems[sgActive]); return; }
+  }
+  if (e.key === 'Enter'){ sgClose(); runSearch(search.value); }
+});
+
+document.addEventListener('click', (ev) => {
+  if (ev.target === search || suggestList.contains(ev.target)) return;
+  sgClose();
+});
 
 /* settings menu */
 settingsButton.addEventListener('click', (ev)=>{ ev.stopPropagation(); settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block'; });
