@@ -30,9 +30,6 @@ body.dark .shortcut{background:var(--card-bg-dark)}
 .shortcut:hover{transform:scale(1.03)}
 .shortcut img{width:32px;height:32px;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;pointer-events:none;-webkit-touch-callout:none;-webkit-user-drag:none}
 
-/* glow in edit mode */
-.shortcut.show-icons{box-shadow:0 0 16px 4px rgba(255,160,0,.65);}
-
 /* separate edit/delete buttons */
 .shortcut .edit-btn,.shortcut .delete-btn{
   position:absolute;
@@ -49,10 +46,17 @@ body.dark .shortcut{background:var(--card-bg-dark)}
   pointer-events:none;
   touch-action:none;
 }
-.shortcut.show-icons .edit-btn,.shortcut.show-icons .delete-btn{opacity:1; pointer-events:auto;}
 .shortcut .edit-btn{top:6px;left:6px}
 .shortcut .delete-btn{top:6px;right:6px}
 .shortcut .edit-btn:active,.shortcut .delete-btn:active{transform:scale(.95)}
+
+/* Edit Mode: show edit/delete icons + glow on every tile (except Add New),
+   and only allow the drag-to-reorder gesture while editing */
+#shortcuts.edit-mode .shortcut:not(.add-tile) .edit-btn,
+#shortcuts.edit-mode .shortcut:not(.add-tile) .delete-btn{opacity:1; pointer-events:auto;}
+#shortcuts.edit-mode .shortcut:not(.add-tile){box-shadow:0 0 16px 4px rgba(255,160,0,.65);}
+#shortcuts:not(.edit-mode) .shortcut:not(.add-tile){touch-action:auto;cursor:pointer}
+#shortcuts.edit-mode .shortcut:not(.add-tile){touch-action:none;cursor:grab}
 
 /* drag over indicator */
 .drag-over{outline:2px dashed #666;transform:scale(1.02)}
@@ -120,6 +124,7 @@ body.dark .shortcut.add-tile:hover {
 </header>
 
 <div id="settings-menu" role="menu" aria-hidden="true">
+  <button id="edit-mode-btn" class="small-btn">Edit Shortcuts</button>
   <button id="add-shortcut-btn" class="small-btn">Add Shortcut</button>
   <button id="toggle-theme" class="small-btn">Toggle Dark/Light</button>
   <button id="import-btn" class="small-btn">Import Shortcuts</button>
@@ -149,6 +154,7 @@ const settingsButton = $('settings-button');
 const settingsMenu = $('settings-menu');
 const toggleThemeBtn = $('toggle-theme');
 const addShortcutBtn = $('add-shortcut-btn');
+const editModeBtn = $('edit-mode-btn');
 const addDialog = $('add-dialog');
 const addForm = $('add-form');
 const cancelAdd = $('cancel-add');
@@ -162,23 +168,24 @@ let suppressClickUntil = 0;
 let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]')
   .map(s => ({ name: s.name || s.title || 'Unnamed', url: s.url || s.href || '' }));
 let editIndex = null;
+let editMode = false;
 
 /* document-level click: close edit mode & settings if click outside tiles/menu */
 document.addEventListener('click', (ev) => {
   if (settingsButton.contains(ev.target) || settingsMenu.contains(ev.target)) return;
   if (ev.target.closest('.shortcut')) return;
-  document.querySelectorAll('.shortcut.show-icons').forEach(t => t.classList.remove('show-icons'));
   settingsMenu.style.display = 'none';
 });
 
 /* render */
 function renderShortcuts(){
   shortcutsEl.innerHTML = '';
+  shortcutsEl.classList.toggle('edit-mode', editMode);
   shortcuts.forEach((s, i) => {
     const tile = document.createElement('div');
     tile.className = 'shortcut';
     tile.dataset.index = i;
-    tile.draggable = true;
+    tile.draggable = editMode;
 
     const favicon = document.createElement('img');
     try { favicon.src = s.url ? `https://www.google.com/s2/favicons?sz=64&domain_url=${new URL(s.url).origin}` : ''; } catch(e){ favicon.src=''; }
@@ -219,14 +226,15 @@ function renderShortcuts(){
     shortcutsEl.appendChild(tile);
 
     /* ---- pointer-based interaction for tile ----
-       pointerdown -> start longpress timer and record coords
-       pointermove -> detect movement (>threshold) => dragging candidate
-       pointerup   -> if dragging => perform reorder on touch; if short tap => open url; if longpress fired => nothing (icons shown)
+       Normal mode: short tap -> open url. No long-press behavior, no reordering.
+       Edit Mode:   short tap -> open edit dialog (same as the pencil icon).
+                    long-press then move -> reorder tile (the ONLY way to reorder).
     */
     let pointerId = null;
     let startX = 0, startY = 0;
     let moved = false;
     let longPressFired = false;
+    let aborted = false; // gesture moved before long-press fired (edit mode) -> ignore on release
     let longPressTimer = null;
     const LONG_PRESS_MS = 600;
     const MOVE_THRESHOLD = 8;
@@ -237,55 +245,71 @@ function renderShortcuts(){
       pointerId = ev.pointerId;
       moved = false;
       longPressFired = false;
+      aborted = false;
       startX = ev.clientX;
       startY = ev.clientY;
-      // start long press timer
       clearLongPress();
-      longPressTimer = setTimeout(() => {
-        longPressFired = true;
-        tile.classList.add('show-icons');
-      }, LONG_PRESS_MS);
+      if (editMode){
+        // only Edit Mode arms the long-press-to-reorder gesture
+        longPressTimer = setTimeout(() => { longPressFired = true; }, LONG_PRESS_MS);
+      }
       // capture pointer so we get moves/up even if pointer leaves
       try { tile.setPointerCapture(pointerId); } catch(e){}
     }
     function movePointer(ev){
       if (ev.pointerId !== pointerId) return;
       const dx = Math.abs(ev.clientX - startX), dy = Math.abs(ev.clientY - startY);
-      if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD){
+      if (dx <= MOVE_THRESHOLD && dy <= MOVE_THRESHOLD) return;
+      if (!editMode){
+        // normal mode: no reordering; movement just cancels a potential tap (e.g. page scroll)
         moved = true;
-        clearLongPress();
-        // highlight potential drop target
-        const under = document.elementFromPoint(ev.clientX, ev.clientY);
-        const potential = under ? under.closest('.shortcut') : null;
-        document.querySelectorAll('.shortcut').forEach(n=>n.classList.remove('drag-over'));
-        if (potential && potential !== tile) potential.classList.add('drag-over');
+        return;
       }
+      if (!longPressFired){
+        // moved before the long-press fired -> not a reorder gesture, abandon it
+        clearLongPress();
+        aborted = true;
+        return;
+      }
+      moved = true;
+      // highlight potential drop target
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const potential = under ? under.closest('.shortcut') : null;
+      document.querySelectorAll('.shortcut').forEach(n=>n.classList.remove('drag-over'));
+      if (potential && potential !== tile) potential.classList.add('drag-over');
     }
     function endPointer(ev){
       if (ev.pointerId !== pointerId) return;
       clearLongPress();
       try { tile.releasePointerCapture(pointerId); } catch(e){}
       document.querySelectorAll('.shortcut').forEach(n=>n.classList.remove('drag-over'));
-      // if moved -> reorder (touch style)
-      if (moved){
-        const under = document.elementFromPoint(ev.clientX, ev.clientY);
-        const target = under ? under.closest('.shortcut') : null;
-        if (target && target !== tile){
-          const from = parseInt(tile.dataset.index,10);
-          const to   = parseInt(target.dataset.index,10);
-          if (!Number.isNaN(from) && !Number.isNaN(to) && from !== to){
-            const movedItem = shortcuts.splice(from,1)[0];
-            shortcuts.splice(to,0,movedItem);
-            saveAndRender();
+
+      if (editMode){
+        // reorder: only when a long-press was held, then dragged onto another tile
+        if (longPressFired && moved){
+          const under = document.elementFromPoint(ev.clientX, ev.clientY);
+          const target = under ? under.closest('.shortcut') : null;
+          if (target && target !== tile){
+            const from = parseInt(tile.dataset.index,10);
+            const to   = parseInt(target.dataset.index,10);
+            if (!Number.isNaN(from) && !Number.isNaN(to) && from !== to){
+              const movedItem = shortcuts.splice(from,1)[0];
+              shortcuts.splice(to,0,movedItem);
+              saveAndRender();
+            }
           }
+          pointerId = null; moved=false;
+          return;
         }
-        pointerId = null; moved=false;
+        // short tap in Edit Mode (no long-press, no movement) -> open edit dialog
+        if (!longPressFired && !moved && !aborted){
+          openEditModal(i);
+        }
+        pointerId = null;
         return;
       }
-      // if long press was fired, we already showed icons; don't open URL on release
-      if (longPressFired){ pointerId = null; return; }
 
-      // short tap -> open url (but ensure the tap wasn't on a button; buttons consumed pointerdown so won't reach here)
+      // normal mode: short tap -> open url
       if (!moved){
         if (s.url) window.open(s.url, '_blank');
       }
@@ -304,12 +328,13 @@ function renderShortcuts(){
     tile.addEventListener('pointerup', endPointer, {passive:false});
     tile.addEventListener('pointercancel', cancelPointer, {passive:false});
 
-    /* desktop native drag/drop (mouse) still supported */
+    /* desktop native drag/drop (mouse) - only enabled while in Edit Mode (tile.draggable is set accordingly) */
     tile.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', tile.dataset.index); tile.classList.add('dragging'); });
     tile.addEventListener('dragend', () => { tile.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(n=>n.classList.remove('drag-over')); });
-    tile.addEventListener('dragover', (e) => { e.preventDefault(); if (!tile.classList.contains('dragging')) tile.classList.add('drag-over'); });
+    tile.addEventListener('dragover', (e) => { if (!editMode) return; e.preventDefault(); if (!tile.classList.contains('dragging')) tile.classList.add('drag-over'); });
     tile.addEventListener('dragleave', () => tile.classList.remove('drag-over'));
     tile.addEventListener('drop', (e) => {
+      if (!editMode) return;
       e.preventDefault();
       const from = parseInt(e.dataTransfer.getData('text/plain'),10);
       const to = parseInt(tile.dataset.index,10);
@@ -370,6 +395,12 @@ function openEditModal(index){
   setTimeout(() => $('shortcut-name').focus(), 100);
 }
 addShortcutBtn.addEventListener('click', ()=>{ editIndex=null; dialogTitle.textContent='Add Shortcut'; addSaveBtn.textContent='Add'; addForm.reset(); addDialog.style.display='flex'; setTimeout(() => $('shortcut-name').focus(), 100); });
+editModeBtn.addEventListener('click', ()=>{
+  editMode = !editMode;
+  editModeBtn.textContent = editMode ? 'Exit Edit Mode' : 'Edit Shortcuts';
+  settingsMenu.style.display = 'none';
+  renderShortcuts();
+});
 cancelAdd.addEventListener('click', ()=>{ addDialog.style.display='none'; editIndex=null; });
 addForm.addEventListener('submit', (ev)=>{ ev.preventDefault(); const name=$('shortcut-name').value.trim(); const url=$('shortcut-url').value.trim(); if(!name||!url) return; if(editIndex!==null) shortcuts[editIndex]={name,url}; else shortcuts.push({name,url}); saveAndRender(); addDialog.style.display='none'; editIndex=null; });
 
