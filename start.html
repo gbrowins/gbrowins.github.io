@@ -17,11 +17,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 #search-container{flex:0 0 80%;margin-right:10px;position:relative}
 #search{width:100%;padding:8px 34px 8px 10px;border:1px solid #999;border-radius:5px;font-size:16px;box-sizing:border-box}
 #search-clear{
-  display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);
-  background:none;border:none;color:inherit;opacity:.55;cursor:pointer;
-  font-size:20px;line-height:1;padding:4px 6px;
+  display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  width:26px;height:26px;align-items:center;justify-content:center;
+  background:none;border:none;color:#666;cursor:pointer;
+  font-size:18px;line-height:1;padding:0;border-radius:50%;
 }
-#search-clear:hover{opacity:.9}
+body.dark #search-clear{color:#aaa}
+#search-clear:hover{background:rgba(0,0,0,.08);color:#333}
+body.dark #search-clear:hover{background:rgba(255,255,255,.15);color:#eee}
 #search-suggestions{
   position:absolute;left:0;right:0;top:100%;margin-top:4px;
   list-style:none;padding:4px 0;background:var(--card-bg-light);
@@ -396,7 +399,7 @@ function renderShortcuts(){
 function saveAndRender(){ localStorage.setItem('shortcuts', JSON.stringify(shortcuts)); renderShortcuts(); }
 
 /* search + live DuckDuckGo suggestions (via our own Cloudflare Worker proxy) */
-const WORKER_URL = 'https://ddg-suggest.gbrowins.workers.dev'; // <-- set this after deploying the Worker
+const WORKER_URL = 'https://REPLACE-WITH-YOUR-WORKER.workers.dev'; // <-- set this after deploying the Worker
 
 let sgItems = [];       // current suggestion strings
 let sgActive = -1;      // keyboard-highlighted index
@@ -454,7 +457,7 @@ function sgFetch(q){
 }
 
 function updateClearBtn(){
-  searchClear.style.display = search.value ? 'block' : 'none';
+  searchClear.style.display = search.value ? 'flex' : 'none';
 }
 
 search.addEventListener('input', () => {
