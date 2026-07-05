@@ -399,7 +399,7 @@ function renderShortcuts(){
 function saveAndRender(){ localStorage.setItem('shortcuts', JSON.stringify(shortcuts)); renderShortcuts(); }
 
 /* search + live DuckDuckGo suggestions (via our own Cloudflare Worker proxy) */
-const WORKER_URL = 'https://REPLACE-WITH-YOUR-WORKER.workers.dev'; // <-- set this after deploying the Worker
+const WORKER_URL = 'https://ddg-suggest.gbrowins.workers.dev';
 
 let sgItems = [];       // current suggestion strings
 let sgActive = -1;      // keyboard-highlighted index
