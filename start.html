@@ -423,7 +423,8 @@ function sgRender(){
     li.setAttribute('role','option');
     if (i === sgActive) li.classList.add('active');
     li.addEventListener('mouseenter', () => { sgActive = i; sgRender(); });
-    li.addEventListener('mousedown', (e) => { e.preventDefault(); sgChoose(text); });
+    li.addEventListener('mousedown', (e) => { e.preventDefault(); }); // keep focus on input so the list doesn't vanish before click fires
+    li.addEventListener('click', () => { sgChoose(text); });
     suggestList.appendChild(li);
   });
   suggestList.style.display = 'block';
